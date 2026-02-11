@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local app state / secrets
+.sharme/
+*.db
+*.db-shm
+*.db-wal
+*.enc
+salt
+
+# Environment / local config
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor artifacts
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

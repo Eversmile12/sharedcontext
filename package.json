@@ -1,0 +1,35 @@
+{
+  "name": "@sharme/context",
+  "version": "0.1.0",
+  "description": "Sovereign, portable LLM context layer",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "sharme": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "tsc && node --test dist/test/crypto.test.js dist/test/db.test.js dist/test/passphrase.test.js dist/test/shard.test.js dist/test/engine.test.js dist/test/identity.test.js dist/test/sync.test.js",
+    "test:arweave": "tsc && node --test dist/test/arweave-integration.test.js",
+    "demo": "tsc && rm -rf dist/demo/public && cp -r src/demo/public dist/demo/public && node dist/demo/server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@ardrive/turbo-sdk": "^1.40.2",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
+    "better-sqlite3": "^12.6.2",
+    "commander": "^14.0.3",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.2.2",
+    "typescript": "^5.9.3"
+  }
+}

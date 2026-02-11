@@ -1,0 +1,12 @@
+import { Address } from '@solana/addresses';
+import { FixedSizeDecoder, FixedSizeEncoder, ReadonlyUint8Array } from '@solana/codecs-core';
+import { getStructDecoder, getStructEncoder } from '@solana/codecs-data-structures';
+import { OffchainMessageVersion } from '../version';
+type TDecoderFields = Parameters<typeof getStructDecoder>[0];
+type TEncoderFields = Parameters<typeof getStructEncoder>[0];
+export declare function createOffchainMessagePreambleDecoder<const TVersion extends OffchainMessageVersion, const TFields extends TDecoderFields>(version: TVersion, ...fields: TFields): import("@solana/codecs-core").VariableSizeDecoder<import("@solana/codecs-data-structures/dist/types/utils").DrainOuterGeneric<{ [I in Exclude<(readonly [(readonly ["version", FixedSizeDecoder<TVersion, 1>] | undefined)?, ...Partial<TFields>])["length"], (readonly [readonly ["version", FixedSizeDecoder<TVersion, 1>], ...TFields])["length"]> & number as (readonly [readonly ["version", FixedSizeDecoder<TVersion, 1>], ...TFields])[I][0]]: (readonly [readonly ["version", FixedSizeDecoder<TVersion, 1>], ...TFields])[I][1] extends import("@solana/codecs-core").Decoder<infer TTo> ? TTo : never; }>>;
+export declare function createOffchainMessagePreambleEncoder<const TVersion extends OffchainMessageVersion, const TFields extends TEncoderFields>(version: TVersion, ...fields: TFields): import("@solana/codecs-core").VariableSizeEncoder<import("@solana/codecs-data-structures/dist/types/utils").DrainOuterGeneric<{ [I in Exclude<(readonly [(readonly ["version", FixedSizeEncoder<TVersion, 1>] | undefined)?, ...Partial<TFields>])["length"], (readonly [readonly ["version", FixedSizeEncoder<TVersion, 1>], ...TFields])["length"]> & number as (readonly [readonly ["version", FixedSizeEncoder<TVersion, 1>], ...TFields])[I][0]]: (readonly [readonly ["version", FixedSizeEncoder<TVersion, 1>], ...TFields])[I][1] extends import("@solana/codecs-core").Encoder<infer TFrom> ? TFrom : never; }>>;
+export declare function decodeRequiredSignatoryAddresses(bytes: ReadonlyUint8Array): readonly Address[];
+export declare function getSignatoriesComparator(): (a: ReadonlyUint8Array, b: ReadonlyUint8Array) => -1 | 0 | 1;
+export {};
+//# sourceMappingURL=preamble-common.d.ts.map
