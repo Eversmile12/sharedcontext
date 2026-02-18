@@ -10,10 +10,10 @@ import { autoSetupDetectedClients } from "./setup.js";
 import { generatePhrase, validatePhrase, phraseToString, PHRASE_WORD_COUNT, } from "../core/passphrase.js";
 import { pullAndReconstruct } from "../core/sync.js";
 import { fetchIdentity } from "../core/arweave.js";
-const SHARME_DIR = process.env.SHARME_HOME || join(homedir(), ".sharme");
-const DB_PATH = join(SHARME_DIR, "sharme.db");
-const SALT_PATH = join(SHARME_DIR, "salt");
-const IDENTITY_PATH = join(SHARME_DIR, "identity.enc");
+const SINGLECONTEXT_DIR = process.env.SINGLECONTEXT_HOME || join(homedir(), ".singlecontext");
+const DB_PATH = join(SINGLECONTEXT_DIR, "singlecontext.db");
+const SALT_PATH = join(SINGLECONTEXT_DIR, "salt");
+const IDENTITY_PATH = join(SINGLECONTEXT_DIR, "identity.enc");
 /**
  * Prompt for a single line of input (works in both interactive and piped mode).
  */
@@ -27,19 +27,19 @@ function prompt(question) {
     });
 }
 /**
- * Initialize a new Sharme instance.
+ * Initialize a new SingleContext instance.
  * Generates a 12-word recovery phrase and derives everything from it.
  */
 export async function initCommand() {
     if (existsSync(DB_PATH)) {
-        console.log("Sharme is already initialized at ~/.sharme/");
-        console.log("To reinitialize, delete ~/.sharme/ first.");
+        console.log("SingleContext is already initialized at ~/.singlecontext/");
+        console.log("To reinitialize, delete ~/.singlecontext/ first.");
         return;
     }
-    console.log("Initializing Sharme...\n");
+    console.log("Initializing SingleContext...\n");
     // Create directories
-    mkdirSync(SHARME_DIR, { recursive: true });
-    mkdirSync(join(SHARME_DIR, "shards"), { recursive: true });
+    mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
+    mkdirSync(join(SINGLECONTEXT_DIR, "shards"), { recursive: true });
     // Generate 12-word recovery phrase
     const words = generatePhrase();
     // Show phrase on alternate screen (like vim/less — vanishes when done)
@@ -60,7 +60,7 @@ export async function initCommand() {
     if (parts.length < 2 ||
         parts[0].toLowerCase() !== words[idx1].toLowerCase() ||
         parts[1].toLowerCase() !== words[idx2].toLowerCase()) {
-        console.error("Confirmation failed. Please run `sharme init` again.");
+        console.error("Confirmation failed. Please run `singlecontext init` again.");
         process.exit(1);
     }
     const phrase = phraseToString(words);
@@ -91,25 +91,25 @@ export async function initCommand() {
         console.warn("Could not store in keychain:", err instanceof Error ? err.message : String(err));
         console.warn("Without keychain storage, background MCP startup will fail.");
     }
-    console.log("\nSharme initialized at ~/.sharme/");
-    console.log("  Database: ~/.sharme/sharme.db");
-    console.log("  Shards:   ~/.sharme/shards/");
-    console.log("  Identity: ~/.sharme/identity.enc");
+    console.log("\nSingleContext initialized at ~/.singlecontext/");
+    console.log("  Database: ~/.singlecontext/singlecontext.db");
+    console.log("  Shards:   ~/.singlecontext/shards/");
+    console.log("  Identity: ~/.singlecontext/identity.enc");
     console.log(`\n  Wallet:   ${keypair.address}`);
     printAutoSetupSummary();
-    console.log("\nStart `sharme serve` and use MCP tools to store and recall facts.");
+    console.log("\nStart `singlecontext serve` and use MCP tools to store and recall facts.");
 }
 /**
- * Restore Sharme from an existing recovery phrase.
+ * Restore SingleContext from an existing recovery phrase.
  * Derives the wallet, queries Arweave for shards, and reconstructs local state.
  */
 export async function initExistingCommand() {
     if (existsSync(DB_PATH)) {
-        console.log("Sharme is already initialized at ~/.sharme/");
-        console.log("To reinitialize, delete ~/.sharme/ first.");
+        console.log("SingleContext is already initialized at ~/.singlecontext/");
+        console.log("To reinitialize, delete ~/.singlecontext/ first.");
         return;
     }
-    console.log("Restore Sharme from recovery phrase.\n");
+    console.log("Restore SingleContext from recovery phrase.\n");
     const input = await prompt(`Enter your ${PHRASE_WORD_COUNT}-word recovery phrase: `);
     const words = input.split(/\s+/).map((w) => w.toLowerCase());
     const validation = validatePhrase(words);
@@ -123,8 +123,8 @@ export async function initExistingCommand() {
     const keypair = deriveKeypairFromPhrase(phrase);
     console.log(`Wallet: ${keypair.address}`);
     // Create directories
-    mkdirSync(SHARME_DIR, { recursive: true });
-    mkdirSync(join(SHARME_DIR, "shards"), { recursive: true });
+    mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
+    mkdirSync(join(SINGLECONTEXT_DIR, "shards"), { recursive: true });
     console.log("\nQuerying Arweave and reconstructing local state...");
     try {
         const result = await pullAndReconstruct(keypair.address, phrase, DB_PATH);
@@ -145,7 +145,7 @@ export async function initExistingCommand() {
     }
     catch (err) {
         const { rmSync } = await import("fs");
-        rmSync(SHARME_DIR, { recursive: true, force: true });
+        rmSync(SINGLECONTEXT_DIR, { recursive: true, force: true });
         throw err;
     }
     // Store phrase in keychain
@@ -156,7 +156,7 @@ export async function initExistingCommand() {
     catch (err) {
         console.warn("Could not store in keychain:", err instanceof Error ? err.message : String(err));
     }
-    console.log("\nSharme restored at ~/.sharme/");
+    console.log("\nSingleContext restored at ~/.singlecontext/");
     console.log(`  Wallet: ${keypair.address}`);
     printAutoSetupSummary();
 }
@@ -165,7 +165,7 @@ export async function initExistingCommand() {
  */
 export function loadKey(passphrase) {
     if (!existsSync(SALT_PATH)) {
-        console.error("Sharme not initialized. Run `sharme init` first.");
+        console.error("SingleContext not initialized. Run `singlecontext init` first.");
         process.exit(1);
     }
     const salt = new Uint8Array(readFileSync(SALT_PATH));
@@ -176,20 +176,20 @@ export function loadKey(passphrase) {
  */
 export function loadIdentityPrivateKey(key) {
     if (!existsSync(IDENTITY_PATH)) {
-        console.error("No identity found. Run `sharme init` first.");
+        console.error("No identity found. Run `singlecontext init` first.");
         process.exit(1);
     }
     const encrypted = new Uint8Array(readFileSync(IDENTITY_PATH));
     return decrypt(encrypted, key);
 }
-export function getSharmeDir() {
-    return SHARME_DIR;
+export function getSingleContextDir() {
+    return SINGLECONTEXT_DIR;
 }
 export function getDbPath() {
     return DB_PATH;
 }
 export function getShardsDir() {
-    return join(SHARME_DIR, "shards");
+    return join(SINGLECONTEXT_DIR, "shards");
 }
 export function getSaltPath() {
     return SALT_PATH;
@@ -201,7 +201,7 @@ function printAutoSetupSummary() {
     const result = autoSetupDetectedClients();
     if (result.detected.length === 0) {
         console.log("\nNo supported MCP client detected (Cursor, Claude Desktop/CLI, Codex).");
-        console.log("Run `sharme setup --cursor|--claude|--claude-cli|--codex` after installing your client.");
+        console.log("Run `singlecontext setup --cursor|--claude|--claude-cli|--codex` after installing your client.");
         return;
     }
     if (result.configured.length > 0) {
@@ -212,7 +212,7 @@ function printAutoSetupSummary() {
         console.warn(`Could not configure ${formatTarget(failure.target)}: ${failure.reason}`);
     }
     if (result.failed.length > 0) {
-        const commands = result.failed.map((item) => `sharme setup --${item.target}`).join("  ");
+        const commands = result.failed.map((item) => `singlecontext setup --${item.target}`).join("  ");
         console.warn(`Run manually if needed: ${commands}`);
     }
 }

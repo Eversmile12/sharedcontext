@@ -26,8 +26,8 @@ import type { Fact, ShardOperation } from "../types.js";
 import type Database from "better-sqlite3";
 
 // ── Demo state ────────────────────────────────────────────
-const DEMO_DIR = join("/tmp", `sharme-demo-${randomBytes(4).toString("hex")}`);
-process.env.SHARME_HOME = DEMO_DIR;
+const DEMO_DIR = join("/tmp", `singlecontext-demo-${randomBytes(4).toString("hex")}`);
+process.env.SINGLECONTEXT_HOME = DEMO_DIR;
 
 let db: Database.Database | null = null;
 let encryptionKey: Uint8Array | null = null;
@@ -56,7 +56,7 @@ let savedPassphrase: string | null = null;
 // ── Helpers ───────────────────────────────────────────────
 
 function getDbPath(): string {
-  return join(DEMO_DIR, "sharme.db");
+  return join(DEMO_DIR, "singlecontext.db");
 }
 
 function getShardsDir(): string {
@@ -351,7 +351,7 @@ async function handlePush(_req: IncomingMessage, res: ServerResponse): Promise<v
       arweaveUrl: `https://arweave.net/${txId}`,
       sizeBytes: encryptedPK.length,
       tags: [
-        { name: "App-Name", value: "sharme" },
+        { name: "App-Name", value: "singlecontext" },
         { name: "Type", value: "identity" },
         { name: "Wallet", value: walletAddress },
       ],
@@ -382,7 +382,7 @@ async function handlePush(_req: IncomingMessage, res: ServerResponse): Promise<v
       arweaveUrl: `https://arweave.net/${txId}`,
       sizeBytes: encrypted.length,
       tags: [
-        { name: "App-Name", value: "sharme" },
+        { name: "App-Name", value: "singlecontext" },
         { name: "Type", value: "delta" },
         { name: "Version", value: String(version) },
         { name: "Wallet", value: walletAddress },
@@ -652,7 +652,7 @@ const server = createServer(async (req, res) => {
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 server.listen(PORT, () => {
-  console.log(`\n  Sharme Demo Server`);
+  console.log(`\n  SingleContext Demo Server`);
   console.log(`  ──────────────────`);
   console.log(`  http://localhost:${PORT}`);
   console.log(`  Data dir: ${DEMO_DIR}\n`);

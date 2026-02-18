@@ -20,21 +20,21 @@ describe("engine", () => {
     describe("scope filtering", () => {
         const facts = [
             makeFact({ key: "global-fact", scope: "global" }),
-            makeFact({ key: "sharme-fact", id: "id-s", scope: "project:sharme" }),
+            makeFact({ key: "singlecontext-fact", id: "id-s", scope: "project:singlecontext" }),
             makeFact({ key: "other-fact", id: "id-o", scope: "project:other" }),
         ];
         it("includes global facts for any scope", () => {
-            const result = recallContext("anything", "project:sharme", facts);
+            const result = recallContext("anything", "project:singlecontext", facts);
             const keys = result.map((f) => f.key);
             assert.ok(keys.includes("global-fact"));
         });
         it("includes matching scope facts", () => {
-            const result = recallContext("anything", "project:sharme", facts);
+            const result = recallContext("anything", "project:singlecontext", facts);
             const keys = result.map((f) => f.key);
-            assert.ok(keys.includes("sharme-fact"));
+            assert.ok(keys.includes("singlecontext-fact"));
         });
         it("excludes non-matching scope facts", () => {
-            const result = recallContext("anything", "project:sharme", facts);
+            const result = recallContext("anything", "project:singlecontext", facts);
             const keys = result.map((f) => f.key);
             assert.ok(!keys.includes("other-fact"));
         });
@@ -105,14 +105,14 @@ describe("engine", () => {
     describe("formatContext", () => {
         it("outputs lean format without scope or tags", () => {
             const facts = [
-                makeFact({ key: "project:sharme:storage:backend", value: "Arweave", scope: "project:sharme", tags: ["storage"] }),
+                makeFact({ key: "project:singlecontext:storage:backend", value: "Arweave", scope: "project:singlecontext", tags: ["storage"] }),
             ];
             const output = formatContext(facts);
             assert.ok(output.includes("[MEMORY]"));
             assert.ok(output.includes("[/MEMORY]"));
             assert.ok(output.includes("storage backend: Arweave"));
             // Should NOT contain internal metadata
-            assert.ok(!output.includes("[project:sharme]"));
+            assert.ok(!output.includes("[project:singlecontext]"));
             assert.ok(!output.includes("(tags:"));
         });
         it("strips global prefix from keys", () => {

@@ -1,29 +1,29 @@
-# Sharme: Sovereign Portable LLM Context
+# SingleContext: Sovereign Portable LLM Context
 
 ## Quick Start (3 Minutes)
 
 1. Initialize identity and local storage:
 
 ```bash
-sharme init
+singlecontext init
 ```
 
 2. Start background sync + MCP tools:
 
 ```bash
-sharme serve
+singlecontext serve
 ```
 
-3. Use MCP memory tools while `sharme serve` is running:
+3. Use MCP memory tools while `singlecontext serve` is running:
 
 ```bash
-sharme serve
+singlecontext serve
 ```
 
 4. On a new machine:
 
 ```bash
-sharme init --existing
+singlecontext init --existing
 ```
 
 Enter your 12-word phrase to restore state from Arweave.
@@ -32,7 +32,7 @@ Enter your 12-word phrase to restore state from Arweave.
 
 LLM conversations are stateless by default. Project decisions, preferences, and technical context are easy to lose across sessions, machines, and tools.
 
-Sharme exists to make that context:
+SingleContext exists to make that context:
 
 - durable across time
 - portable across devices
@@ -41,9 +41,9 @@ Sharme exists to make that context:
 
 The goal is practical developer memory ownership: your context remains yours, not tied to one chat thread or one machine.
 
-## What Sharme Is (Current Implementation)
+## What SingleContext Is (Current Implementation)
 
-Sharme is a TypeScript CLI + MCP server with:
+SingleContext is a TypeScript CLI + MCP server with:
 
 - local structured-memory cache in SQLite
 - encrypted shard uploads to Arweave (via Turbo backend)
@@ -107,7 +107,7 @@ Only newly appended messages are uploaded on each sync run.
 
 ## Identity and Recovery Phrase
 
-Sharme currently uses a 12-word phrase format:
+SingleContext currently uses a 12-word phrase format:
 
 - BIP39 English word list
 - 128-bit entropy + checksum validation
@@ -117,13 +117,13 @@ Checksum validation detects many input typos during restore.
 
 ## How Saving Works
 
-Sharme has two save pipelines: one for structured facts and one for conversation history.
+SingleContext has two save pipelines: one for structured facts and one for conversation history.
 
 ### Structured Fact Save Pipeline (Step by Step)
 
 1. A fact is created through MCP tool `store_fact(...)`.
 2. The fact is written to SQLite (`facts` table) with `dirty=1`.
-3. MCP auto-sync loop (every 60 seconds while `sharme serve` runs) reads:
+3. MCP auto-sync loop (every 60 seconds while `singlecontext serve` runs) reads:
    - dirty facts (`getDirtyFacts`)
    - pending deletes (`getPendingDeletes`)
 4. Those changes are converted to shard operations:
@@ -134,7 +134,7 @@ Sharme has two save pipelines: one for structured facts and one for conversation
 7. Shard bytes are encrypted locally (AES-256-GCM).
 8. Encrypted blob is signed with the wallet private key (secp256k1 signature in tags).
 9. Blob is uploaded through Turbo backend with tags such as:
-   - `App-Name=sharme`
+   - `App-Name=singlecontext`
    - `Wallet=<address>`
    - `Type=delta`
    - `Version=<n>`
@@ -147,7 +147,7 @@ Sharme has two save pipelines: one for structured facts and one for conversation
    - `~/.cursor/projects/*/agent-transcripts/*.txt`
    - `~/.claude/projects/*/*.jsonl`
 2. Changed files are parsed into normalized `Conversation` objects.
-3. For each session, Sharme reads last synced cursor from SQLite meta:
+3. For each session, SingleContext reads last synced cursor from SQLite meta:
    - key format: `conversation_offset:<client>:<session>`
 4. It slices only new messages after that offset.
 5. If there are no new messages, nothing is uploaded.
@@ -172,7 +172,7 @@ Sharme has two save pipelines: one for structured facts and one for conversation
 
 When `recall_context(topic, scope?)` is called:
 
-1. Sharme loads facts from local SQLite.
+1. SingleContext loads facts from local SQLite.
 2. Scope filter keeps:
    - `global`
    - plus selected project scope (current project by default in MCP and CLI)
@@ -228,16 +228,16 @@ When `recall_conversation(topic, client?, project?)` runs:
 
 ### First Device
 
-1. `sharme init`
+1. `singlecontext init`
 2. store facts and/or run MCP server
-3. keep `sharme serve` running to auto-sync
+3. keep `singlecontext serve` running to auto-sync
 
 ### New Device (preferred)
 
-1. `sharme init --existing`
+1. `singlecontext init --existing`
 2. enter 12-word phrase
-3. Sharme reconstructs SQLite from Arweave and persists local identity material (`salt`, `identity.enc`)
-4. run `sharme serve`
+3. SingleContext reconstructs SQLite from Arweave and persists local identity material (`salt`, `identity.enc`)
+4. run `singlecontext serve`
 
 ## Security Model (Implemented)
 
@@ -250,7 +250,7 @@ When `recall_conversation(topic, client?, project?)` runs:
 
 ## Arweave Access and Reliability
 
-Sharme now supports multi-gateway failover:
+SingleContext now supports multi-gateway failover:
 
 - GraphQL endpoints default:
   - `https://arweave.net/graphql`
@@ -261,8 +261,8 @@ Sharme now supports multi-gateway failover:
 
 Custom gateway lists can be set via:
 
-- `SHARME_ARWEAVE_GQLS`
-- `SHARME_ARWEAVE_DATAS`
+- `SINGLECONTEXT_ARWEAVE_GQLS`
+- `SINGLECONTEXT_ARWEAVE_DATAS`
 
 `queryShards` and `queryConversationChunks` are cursor-paginated (not capped at one 1000-item page).
 
@@ -273,7 +273,7 @@ Custom gateway lists can be set via:
 1. Start server:
 
 ```bash
-sharme serve
+singlecontext serve
 ```
 
 2. During work, store facts via MCP tool calls.
@@ -281,7 +281,7 @@ sharme serve
 
 ### Save + Auto-Sync Example (Conversations)
 
-1. Keep `sharme serve` running.
+1. Keep `singlecontext serve` running.
 2. Continue chatting in Cursor or Claude Code.
 3. Every 30s, watcher detects transcript file changes.
 4. Only new messages are uploaded as signed encrypted segments.
@@ -293,10 +293,10 @@ Use the MCP tool `recall_context(topic, scope?)`. Without `scope`, it defaults t
 ### New Device Restore Example
 
 ```bash
-sharme init --existing
+singlecontext init --existing
 ```
 
-Then enter your 12-word phrase. Sharme restores local state from Arweave and writes local identity artifacts so `sharme serve` can run normally.
+Then enter your 12-word phrase. SingleContext restores local state from Arweave and writes local identity artifacts so `singlecontext serve` can run normally.
 
 ## Current Scope and Limitations
 
@@ -307,7 +307,7 @@ Then enter your 12-word phrase. Sharme restores local state from Arweave and wri
 
 ## Summary
 
-Sharme currently provides an operational path for encrypted developer memory portability:
+SingleContext currently provides an operational path for encrypted developer memory portability:
 
 - capture context locally
 - sync encrypted deltas to Arweave

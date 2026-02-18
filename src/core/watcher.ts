@@ -115,7 +115,7 @@ export class ConversationWatcher {
         const transcriptsDir = join(cursorDir, projectDir, "agent-transcripts");
         if (!existsSync(transcriptsDir)) continue;
 
-        // Extract project name from the directory name (e.g., "Users-vitto-Projects-sharme" → "sharme")
+        // Extract project name from the directory name (e.g., "Users-vitto-Projects-singlecontext" → "singlecontext")
         const project = projectDir.split("-").pop() ?? projectDir;
 
         for (const file of readdirSync(transcriptsDir)) {

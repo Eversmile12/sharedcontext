@@ -1,19 +1,21 @@
 {
-  "name": "@0xvitto/context",
-  "version": "0.1.1",
+  "name": "singlecontext",
+  "version": "0.1.2",
   "description": "Sovereign, portable LLM context layer",
   "type": "module",
   "main": "dist/index.js",
   "files": [
     "dist/**/*",
     "!dist/test/**",
-    "SHARME_OVERVIEW.md"
+    "README.md",
+    "SINGLECONTEXT_OVERVIEW.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "bin": {
-    "sharme": "dist/index.js"
+    "singlecontext": "dist/index.js",
+    "sc": "dist/index.js"
   },
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc",

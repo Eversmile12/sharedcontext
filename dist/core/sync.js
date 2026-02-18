@@ -13,7 +13,7 @@ const MAX_PULL_IDENTITY_BYTES = 16 * 1024;
  */
 export function buildShardTags(walletAddress, version, type, signature) {
     return [
-        { name: "App-Name", value: "sharme" },
+        { name: "App-Name", value: "singlecontext" },
         { name: "Wallet", value: walletAddress },
         { name: "Version", value: String(version) },
         { name: "Type", value: type },
@@ -39,7 +39,7 @@ export async function pushShard(encryptedBlob, version, type, walletAddress, pri
 export async function pushIdentity(salt, encryptedPrivateKey, walletAddress, identityPrivateKey, backend) {
     const signature = signShard(encryptedPrivateKey, identityPrivateKey);
     const tags = [
-        { name: "App-Name", value: "sharme" },
+        { name: "App-Name", value: "singlecontext" },
         { name: "Wallet", value: walletAddress },
         { name: "Type", value: "identity" },
         { name: "Salt", value: Buffer.from(salt).toString("hex") },
@@ -58,7 +58,7 @@ export async function pullAndReconstruct(walletAddress, passphrase, dbPath) {
     const identity = await fetchIdentity(walletAddress, MAX_PULL_IDENTITY_BYTES);
     if (!identity) {
         throw new Error("No identity found on Arweave for this wallet. " +
-            "Make sure you ran `sharme init` on another device and pushed the identity.");
+            "Make sure you ran `singlecontext init` on another device and pushed the identity.");
     }
     // Step 2: Derive key from passphrase + salt
     const key = deriveKey(passphrase, identity.salt);
@@ -165,7 +165,7 @@ export async function pushConversationDelta(conversation, encryptionKey, walletA
         const chunk = chunks[i];
         const signature = signShard(chunk, privateKey);
         const tags = [
-            { name: "App-Name", value: "sharme" },
+            { name: "App-Name", value: "singlecontext" },
             { name: "Wallet", value: walletAddress },
             { name: "Type", value: "conversation" },
             { name: "Client", value: conversation.client },

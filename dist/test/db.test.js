@@ -22,7 +22,7 @@ function makeFact(overrides = {}) {
 let tmpDir;
 let db;
 function freshDb() {
-    tmpDir = mkdtempSync(join(tmpdir(), "sharme-test-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "singlecontext-test-"));
     return openDatabase(join(tmpDir, "test.db"));
 }
 describe("db", () => {
@@ -95,9 +95,9 @@ describe("db", () => {
     describe("getFactsByScope", () => {
         it("returns global + matching scope facts", () => {
             upsertFact(db, makeFact({ key: "g", scope: "global" }));
-            upsertFact(db, makeFact({ key: "p", id: "id-p", scope: "project:sharme" }));
+            upsertFact(db, makeFact({ key: "p", id: "id-p", scope: "project:singlecontext" }));
             upsertFact(db, makeFact({ key: "other", id: "id-o", scope: "project:other" }));
-            const results = getFactsByScope(db, "project:sharme");
+            const results = getFactsByScope(db, "project:singlecontext");
             const keys = results.map((f) => f.key).sort();
             assert.deepEqual(keys, ["g", "p"]);
         });

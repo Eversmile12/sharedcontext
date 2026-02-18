@@ -10,7 +10,7 @@ import { discoverConversations } from "./list.js";
 import type { Conversation } from "../types.js";
 import type { Tag } from "../core/storage.js";
 
-const SHARE_URL_PREFIX = "sharme://share/";
+const SHARE_URL_PREFIX = "singlecontext://share/";
 
 export interface ShareCommandOptions {
   client?: "cursor" | "claude-code";
@@ -45,11 +45,11 @@ export async function shareCommand(
   const passphrase = keychainLoad();
   if (!passphrase) {
     throw new Error(
-      "No passphrase found in system keychain. Run `sharme init` again to store it."
+      "No passphrase found in system keychain. Run `singlecontext init` again to store it."
     );
   }
   if (!existsSync(getIdentityPath())) {
-    throw new Error("No local identity found. Run `sharme init` first.");
+    throw new Error("No local identity found. Run `singlecontext init` first.");
   }
 
   const encryptionKey = loadKey(passphrase);
@@ -68,7 +68,7 @@ export async function shareCommand(
   const signature = signShard(encrypted, identityKey);
   const walletAddress = addressFromPublicKey(publicKeyFromPrivate(identityKey));
   const tags: Tag[] = [
-    { name: "App-Name", value: "sharme" },
+    { name: "App-Name", value: "singlecontext" },
     { name: "Type", value: "conversation-share" },
     { name: "Share-Id", value: shareId },
     { name: "Wallet", value: walletAddress },
@@ -79,7 +79,7 @@ export async function shareCommand(
 
   const backend = new TurboBackend({
     privateKeyHex: Buffer.from(identityKey).toString("hex"),
-    testnet: process.env.SHARME_TESTNET === "true",
+    testnet: process.env.SINGLECONTEXT_TESTNET === "true",
   });
   const result = await backend.upload(encrypted, tags);
 
@@ -94,7 +94,7 @@ export async function shareCommand(
   console.log("Conversation shared.");
   console.log(`Link: ${url}`);
   console.log("\nImport on another device:");
-  console.log(`sharme sync ${url}`);
+  console.log(`singlecontext sync ${url}`);
 
   if (options.verbose) {
     console.log("\nDetails:");
@@ -171,7 +171,7 @@ async function resolveConversation(
 
   if (byId.length === 0) {
     throw new Error(
-      "Conversation not found. Run `sharme list conversations` and use an existing ID."
+      "Conversation not found. Run `singlecontext list conversations` and use an existing ID."
     );
   }
   if (byId.length > 1 && !client) {

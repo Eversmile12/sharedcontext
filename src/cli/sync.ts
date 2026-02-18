@@ -20,7 +20,7 @@ const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export async function syncCommand(urlOrToken: string): Promise<void> {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
-    console.error("Sharme not initialized. Run `sharme init` first.");
+    console.error("SingleContext not initialized. Run `singlecontext init` first.");
     process.exit(1);
   }
 

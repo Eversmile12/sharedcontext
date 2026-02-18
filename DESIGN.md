@@ -1,10 +1,10 @@
-# Sharme - Sovereign, Portable LLM Context
+# SingleContext - Sovereign, Portable LLM Context
 
 ## 1. Goal
 
 LLMs have no durable memory. Every new session starts from zero. Context built across hundreds of conversations is lost, trapped in platform silos, or stored on third-party servers the user does not control.
 
-Sharme is a portable, encrypted, user-sovereign context layer for LLMs. It gives developers a single place to store structured memory, encrypted with keys only they hold, persisted on decentralized storage, and retrievable from any device into any model.
+SingleContext is a portable, encrypted, user-sovereign context layer for LLMs. It gives developers a single place to store structured memory, encrypted with keys only they hold, persisted on decentralized storage, and retrievable from any device into any model.
 
 ### Objectives
 
@@ -25,7 +25,7 @@ Sharme is a portable, encrypted, user-sovereign context layer for LLMs. It gives
 
 ## 2. Protocol vs Client
 
-Sharme is a **protocol** first, a tool second.
+SingleContext is a **protocol** first, a tool second.
 
 The protocol is:
 - Encrypted shards stored permanently on Arweave, tagged with the owner's identity.
@@ -36,7 +36,7 @@ The protocol is:
 
 Any software that knows the wallet address (public, to query Arweave) and the user's passphrase (to decrypt) can reconstruct the full context from scratch. The MCP server, CLI, and API proxy are client implementations. They are convenient, not required.
 
-If the user decides tomorrow to ditch all Sharme tooling and write a Python script that queries Arweave, fetches shards, and decrypts them, that works. The data is on permissionless public infrastructure. No gatekeeper.
+If the user decides tomorrow to ditch all SingleContext tooling and write a Python script that queries Arweave, fetches shards, and decrypts them, that works. The data is on permissionless public infrastructure. No gatekeeper.
 
 ---
 
@@ -95,8 +95,8 @@ Small, high-value, always loaded. These are distilled facts about the user and t
 ```json
 {
   "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "scope": "project:sharme",
-  "key": "sharme:storage:backend",
+  "scope": "project:singlecontext",
+  "key": "singlecontext:storage:backend",
   "value": "Using Arweave for permanent shard storage. Chose over IPFS because of guaranteed permanence, pay-once model, no pinning dependency.",
   "tags": ["storage", "arweave", "architecture", "decision"],
   "confidence": 1.0,
@@ -116,8 +116,8 @@ Tags describe both the topic and the nature of the fact. There is no separate "c
 | Key | Tags | Scope |
 |---|---|---|
 | `global:coding_style` | preference, code-style | global |
-| `sharme:storage:backend` | storage, arweave, architecture, decision | project:sharme |
-| `sharme:auth:strategy` | auth, jwt, api, decision | project:sharme |
+| `singlecontext:storage:backend` | storage, arweave, architecture, decision | project:singlecontext |
+| `singlecontext:auth:strategy` | auth, jwt, api, decision | project:singlecontext |
 | `global:arweave_knowledge` | arweave, domain-knowledge | global |
 
 ### Layer 2: Conversation History
@@ -127,7 +127,7 @@ Large, selectively loaded. Full session logs used for deep context retrieval.
 ```json
 {
   "session_id": "session-882a-...",
-  "project": "sharme",
+  "project": "singlecontext",
   "model": "claude-4-opus",
   "platform": "cursor",
   "tags": ["storage", "architecture", "arweave"],
@@ -180,11 +180,11 @@ This is a one-time setup. It nudges the model to use the tools consistently.
 
 ### Example: Full Save Pipeline
 
-**Setup.** You are in Cursor. The Sharme MCP server is running. Your encryption key is in the server's process memory (loaded from OS keychain on startup). Your local SQLite cache has 200 facts from previous sessions.
+**Setup.** You are in Cursor. The SingleContext MCP server is running. Your encryption key is in the server's process memory (loaded from OS keychain on startup). Your local SQLite cache has 200 facts from previous sessions.
 
 #### Step 1: Conversation happens, LLM stores facts
 
-You are working on project "sharme" and you type:
+You are working on project "singlecontext" and you type:
 
 > "Let's use Arweave for the storage layer instead of IPFS"
 
@@ -192,12 +192,12 @@ Claude discusses trade-offs with you. You settle on Arweave. Claude recognizes t
 
 ```
 store_fact(
-  key   = "sharme:storage:backend",
+  key   = "singlecontext:storage:backend",
   value = "Using Arweave for permanent shard storage. Chose over IPFS
            because of guaranteed permanence, pay-once model, no pinning
            dependency.",
   tags  = ["storage", "arweave", "architecture", "decision"],
-  scope = "project:sharme"
+  scope = "project:singlecontext"
 )
 ```
 
@@ -208,7 +208,7 @@ The MCP server receives only this tool call. It does not see the rest of the con
 1. Generates a UUID for the fact: `f47ac10b-58cc-4372-a567-0e02b2c3d479`
 2. Sets metadata: created timestamp, confidence 1.0, access_count 0.
 3. Writes the fact to the local SQLite cache immediately.
-4. Returns to Claude: "Fact stored: sharme:storage:backend"
+4. Returns to Claude: "Fact stored: singlecontext:storage:backend"
 
 Claude tells you "Got it, I'll remember we're using Arweave." The conversation continues. Over the session, 3-5 facts get stored this way.
 
@@ -225,24 +225,24 @@ You close the chat or enough idle time passes. The MCP server collects everythin
     {
       "op": "upsert",
       "fact_id": "f47ac10b...",
-      "key": "sharme:storage:backend",
+      "key": "singlecontext:storage:backend",
       "value": "Using Arweave for permanent shard storage. Chose over IPFS because of guaranteed permanence, pay-once model, no pinning dependency.",
       "tags": ["storage", "arweave", "architecture", "decision"],
-      "scope": "project:sharme",
+      "scope": "project:singlecontext",
       "confidence": 1.0
     },
     {
       "op": "upsert",
       "fact_id": "a1b2c3d4...",
-      "key": "sharme:index:approach",
+      "key": "singlecontext:index:approach",
       "value": "Using Arweave transaction tags as the index. No separate chain needed.",
       "tags": ["arweave", "index", "architecture", "decision"],
-      "scope": "project:sharme",
+      "scope": "project:singlecontext",
       "confidence": 1.0
     },
     {
       "op": "delete",
-      "key": "sharme:storage:ipfs_config"
+      "key": "singlecontext:storage:ipfs_config"
     }
   ]
 }
@@ -280,7 +280,7 @@ The MCP server uploads the encrypted blob to Arweave via Turbo (ArDrive's bundli
 Arweave transaction:
   data: [550 bytes of encrypted shard]
   tags:
-    App-Name:    "sharme"
+    App-Name:    "singlecontext"
     Wallet:      "0xABC123..."           (owner identity)
     Version:     "47"
     Type:        "delta"                 (or "snapshot" for compaction)
@@ -292,7 +292,7 @@ The transaction is submitted through Turbo to the Arweave network. It gets a per
 
 Cost: **free.** Turbo subsidizes uploads under 100 KiB on mainnet. A typical delta shard is ~550 bytes. The data is now stored permanently. 200+ years. Nobody can delete it. Nobody can read it without the passphrase.
 
-The tags serve as the index. To find all shards for this wallet, any device can query Arweave for transactions matching `App-Name: "sharme"` and `Wallet: "0xABC123..."`.
+The tags serve as the index. To find all shards for this wallet, any device can query Arweave for transactions matching `App-Name: "singlecontext"` and `Wallet: "0xABC123..."`.
 
 #### Summary of the save pipeline
 
@@ -341,7 +341,7 @@ Every shard uploaded to Arweave carries tags identifying the owner, version, and
 query {
   transactions(
     tags: [
-      { name: "App-Name", values: ["sharme"] },
+      { name: "App-Name", values: ["singlecontext"] },
       { name: "Wallet", values: ["0xABC123..."] }
     ],
     sort: HEIGHT_ASC
@@ -385,13 +385,13 @@ At typical fact sizes (~500 bytes encrypted), a single 90 KiB shard holds ~150 f
 | Monthly compaction snapshot | 1-3 shards, ~90 KiB each | **Free** (each under 100 KiB) | Monthly |
 | Yearly total | Hundreds of shards | **Free** | Ongoing |
 
-**Turbo subsidizes all uploads under 100 KiB on mainnet.** Since every Sharme shard is capped at 90 KiB, typical individual use costs exactly $0. This applies to both delta shards and compaction snapshots.
+**Turbo subsidizes all uploads under 100 KiB on mainnet.** Since every SingleContext shard is capped at 90 KiB, typical individual use costs exactly $0. This applies to both delta shards and compaction snapshots.
 
 The only scenario requiring payment is if a single fact's value is so large that one operation alone exceeds 90 KiB — which would be an abuse case, not normal usage.
 
 ### Funding Arweave Storage
 
-For typical usage, **no funding is needed.** Turbo subsidizes all uploads under 100 KiB on mainnet, and every Sharme shard is capped at 90 KiB.
+For typical usage, **no funding is needed.** Turbo subsidizes all uploads under 100 KiB on mainnet, and every SingleContext shard is capped at 90 KiB.
 
 If a user somehow needs to upload larger items, Arweave transactions are paid through Turbo (ArDrive's bundling service). Users do not need to buy AR tokens directly. Turbo accepts ETH, SOL, credit cards, and other payment methods.
 
@@ -403,7 +403,7 @@ For the research prototype, Turbo testnet (Base Sepolia) is used for integration
 
 ### Scenario A: Same device, next day
 
-You open Cursor. Cursor spawns the Sharme MCP server as a background subprocess (configured in `.cursor/mcp.json`). The MCP server reads the encryption key from the OS keychain silently. No passphrase prompt.
+You open Cursor. Cursor spawns the SingleContext MCP server as a background subprocess (configured in `.cursor/mcp.json`). The MCP server reads the encryption key from the OS keychain silently. No passphrase prompt.
 
 1. Opens the local SQLite cache. It has 203 facts from previous sessions.
 2. Background sync: queries Arweave for the latest shard version for this wallet, compares to the local version. If the same, nothing to do. If remote is ahead (you used another device), it pulls the new shards, decrypts them, and applies the deltas.
@@ -411,42 +411,42 @@ You open Cursor. Cursor spawns the Sharme MCP server as a background subprocess 
 
 You start chatting. You say:
 
-> "What's the architecture of the sharme project?"
+> "What's the architecture of the singlecontext project?"
 
 Claude's system prompt (from `.cursor/rules`) tells it to check context, so it calls:
 
 ```
-recall_context(topic = "sharme architecture")
+recall_context(topic = "singlecontext architecture")
 ```
 
 The MCP server runs the context engine against the local SQLite cache:
 
 **Tier 1 - Scope filter:**
 ```
-Current working directory: /Users/dev/Projects/sharme
-Filter: scope == "global" OR scope == "project:sharme"
+Current working directory: /Users/dev/Projects/singlecontext
+Filter: scope == "global" OR scope == "project:singlecontext"
 203 facts -> 34 facts
 ```
 
 **Tier 2 - Tag matching and scoring:**
 ```
-Query keywords extracted: ["sharme", "architecture"]
+Query keywords extracted: ["singlecontext", "architecture"]
 
 Scoring each fact:
 
-  "sharme:storage:backend" (tags: storage, arweave, architecture, decision)
+  "singlecontext:storage:backend" (tags: storage, arweave, architecture, decision)
      tag match: "architecture" hits         = 10 points
      recency: confirmed yesterday           =  8 points
      access_count: 2                        =  2 points
      TOTAL: 20 points
 
-  "sharme:index:approach" (tags: arweave, index, architecture, decision)
+  "singlecontext:index:approach" (tags: arweave, index, architecture, decision)
      tag match: "architecture" hits         = 10 points
      recency: confirmed yesterday           =  8 points
      access_count: 1                        =  1 point
      TOTAL: 19 points
 
-  "sharme:auth:strategy" (tags: auth, jwt, api, decision)
+  "singlecontext:auth:strategy" (tags: auth, jwt, api, decision)
      tag match: none                        =  0 points
      recency: confirmed last week           =  4 points
      access_count: 8                        =  4 points
@@ -473,31 +473,31 @@ You buy a new laptop. Clean machine. Nothing on it.
 #### Step 1: Install
 
 ```
-$ npm i -g @sharme/context
+$ npm i -g singlecontext
 ```
 
 #### Step 2: Initialize with existing identity
 
 ```
-$ sharme init --existing
+$ singlecontext init --existing
 > Ethereum wallet address (your identity): 0xABC123...
 > Passphrase: ********
 > Store passphrase in system keychain? (y/n): y
 ```
 
-The `--existing` flag tells Sharme to recover context from the network, not create a fresh identity.
+The `--existing` flag tells SingleContext to recover context from the network, not create a fresh identity.
 
 The passphrase is stored in the OS keychain (macOS Keychain, Windows Credential Manager, or Linux libsecret) so the MCP server can start silently in the future without prompting.
 
-#### Step 3: Sharme finds your data on Arweave
+#### Step 3: SingleContext finds your data on Arweave
 
-Sharme queries Arweave's GraphQL gateway:
+SingleContext queries Arweave's GraphQL gateway:
 
 ```graphql
 query {
   transactions(
     tags: [
-      { name: "App-Name", values: ["sharme"] },
+      { name: "App-Name", values: ["singlecontext"] },
       { name: "Wallet", values: ["0xABC123..."] }
     ],
     sort: HEIGHT_ASC
@@ -525,7 +525,7 @@ Results:
   ar_tx_047 (version 47, type: delta)
 ```
 
-Sharme sees the snapshot at version 45. It only needs to fetch 3 things: the snapshot + 2 deltas after it. Not all 47.
+SingleContext sees the snapshot at version 45. It only needs to fetch 3 things: the snapshot + 2 deltas after it. Not all 47.
 
 **Cost:** Free. Arweave reads cost nothing.
 
@@ -544,7 +544,7 @@ Time: 1-3 seconds
 
 #### Step 5: Verify ownership
 
-For each shard, Sharme checks the `Signature` tag:
+For each shard, SingleContext checks the `Signature` tag:
 
 1. Hash the shard data: `shard_hash = SHA-256(encrypted_blob)`.
 2. Recover the signer address from the signature: `recovered = ecrecover(shard_hash, signature)`.
@@ -576,14 +576,14 @@ Apply snapshot (version 45):
   State: { 195 facts }
 
 Apply delta (version 46):
-  upsert "sharme:encryption:algorithm" -> "AES-256-GCM"
-  upsert "sharme:encryption:kdf" -> "Argon2id"
+  upsert "singlecontext:encryption:algorithm" -> "AES-256-GCM"
+  upsert "singlecontext:encryption:kdf" -> "Argon2id"
   State: { 197 facts }
 
 Apply delta (version 47):
-  upsert "sharme:storage:backend" -> "Using Arweave..."
-  upsert "sharme:index:approach" -> "Arweave tags as index..."
-  delete "sharme:storage:ipfs_config"
+  upsert "singlecontext:storage:backend" -> "Using Arweave..."
+  upsert "singlecontext:index:approach" -> "Arweave tags as index..."
+  delete "singlecontext:storage:ipfs_config"
   State: { 199 facts }
 
 Final state: 199 active facts.
@@ -600,7 +600,7 @@ Write all 199 facts to local SQLite. Set local version to 47. The cache is now i
 ```
 > Synced from Arweave: 199 facts across 3 projects.
 > Passphrase stored in system keychain.
-> Run: sharme serve
+> Run: singlecontext serve
 ```
 
 Add the MCP server to Cursor's config:
@@ -608,8 +608,8 @@ Add the MCP server to Cursor's config:
 ```json
 {
   "mcpServers": {
-    "sharme": {
-      "command": "sharme",
+    "singlecontext": {
+      "command": "singlecontext",
       "args": ["serve"]
     }
   }
@@ -643,13 +643,13 @@ All three methods require a local process on the user's device. The decryption m
 
 For MCP-compatible clients (Cursor, Claude Code, and others supporting the protocol).
 
-MCP servers communicate over **stdio** (stdin/stdout), not HTTP. When Cursor sees the MCP config, it spawns `sharme serve` as a child process and talks to it through pipes. No port, no URL, no network endpoint. The MCP server is a local subprocess of Cursor.
+MCP servers communicate over **stdio** (stdin/stdout), not HTTP. When Cursor sees the MCP config, it spawns `singlecontext serve` as a child process and talks to it through pipes. No port, no URL, no network endpoint. The MCP server is a local subprocess of Cursor.
 
 ```
-Cursor spawns: sharme serve
+Cursor spawns: singlecontext serve
        ^ stdin/stdout pipes (local, no network)
        v
-Sharme MCP server (holds key, has cache)
+SingleContext MCP server (holds key, has cache)
 ```
 
 The MCP server reads the encryption key from the OS keychain on startup. No interactive passphrase prompt (Cursor runs MCP servers as background processes where interactive input is not possible).
@@ -677,7 +677,7 @@ A local proxy intercepts API calls and injects context:
 ```
 Your code calls:  POST localhost:9999/v1/messages
                          |
-Sharme proxy (local):    |
+SingleContext proxy (local):    |
   1. Reads the user's message
   2. Queries the context engine for relevant facts
   3. Prepends context to the system prompt
@@ -686,15 +686,15 @@ Sharme proxy (local):    |
   6. Returns the response to the application
 ```
 
-The application does not need to know about Sharme. It just talks to a different endpoint.
+The application does not need to know about SingleContext. It just talks to a different endpoint.
 
-Alternatively, use Sharme as a library directly:
+Alternatively, use SingleContext as a library directly:
 
 ```python
-from sharme import ContextEngine
+from singlecontext import ContextEngine
 
 engine = ContextEngine(passphrase="****")
-context = engine.build_context(project="sharme", model="claude-4-opus")
+context = engine.build_context(project="singlecontext", model="claude-4-opus")
 
 response = anthropic.messages.create(
     system=context + your_system_prompt,
@@ -708,7 +708,7 @@ For web UIs (claude.ai, chatgpt.com) or one-off use.
 
 ```bash
 # Export formatted context for a specific model, copy to clipboard
-$ sharme context export --project sharme --model gpt-4o --clipboard
+$ singlecontext context export --project singlecontext --model gpt-4o --clipboard
 > Context copied to clipboard (23 facts, 1,847 tokens)
 
 # Paste into the web UI as your first message
@@ -739,7 +739,7 @@ Every fact has a scope (global or project-specific). The engine knows the curren
 
 ```
 Input:  1000 total facts
-Filter: scope == "global" OR scope == "project:sharme"
+Filter: scope == "global" OR scope == "project:singlecontext"
 Output: ~150 facts
 ```
 
@@ -812,14 +812,14 @@ Small models get only the highest-signal facts. Large models get the full pictur
 
 The user's passphrase is the root of trust. The key lifecycle:
 
-1. During `sharme init`, the user enters a passphrase.
+1. During `singlecontext init`, the user enters a passphrase.
 2. Argon2id derives the AES-256 key from the passphrase.
 3. The derived key is stored in the OS keychain (macOS Keychain, Windows Credential Manager, Linux libsecret).
 4. When the MCP server starts (spawned by Cursor), it reads the key from the keychain silently.
 5. The key exists in process memory while the MCP server is running.
 6. When the process stops, the in-memory key is gone. The keychain retains it for next startup.
 
-The OS keychain is protected by the user's system login (password, biometrics, or both). On macOS, the user may see a "sharme wants to access keychain" prompt on first use.
+The OS keychain is protected by the user's system login (password, biometrics, or both). On macOS, the user may see a "singlecontext wants to access keychain" prompt on first use.
 
 Cross-platform keychain support:
 
@@ -875,14 +875,14 @@ Arweave serves as both the data store and the index. Transaction tags allow quer
 
 Direct Arweave transactions require AR tokens and are slower (wait for block confirmation). Turbo (by ArDrive) is a bundling service that:
 
-- **Free uploads under 100 KiB** on mainnet (covers all Sharme shards).
+- **Free uploads under 100 KiB** on mainnet (covers all SingleContext shards).
 - Accepts payment in ETH, SOL, credit cards, and other methods for larger uploads.
 - Bundles multiple transactions for cheaper storage.
 - Provides instant upload confirmation (data is guaranteed to reach Arweave).
 - Handles the Arweave transaction mechanics transparently.
 - Supports Ethereum signers via `@ardrive/turbo-sdk`.
 
-Users interact with Turbo through Sharme. They never need to manage AR tokens directly.
+Users interact with Turbo through SingleContext. They never need to manage AR tokens directly.
 
 ### Pluggable Backend
 
@@ -931,7 +931,7 @@ Cross-client conversation portability. A background daemon watches local convers
 - [ ] Delta tracking per file (byte offset tracking, only shard new content)
 - [ ] Arweave tags for conversation metadata (project, client, session, timestamp, chunk index) — searchable without decrypting payload
 - [ ] `recall_conversation` MCP tool — query by project/client/date, download, decrypt, truncate to context budget, inject
-- [ ] `sharme import` CLI — manual import of exported conversation transcripts from any source
+- [ ] `singlecontext import` CLI — manual import of exported conversation transcripts from any source
 - [ ] Context budget truncation — if reconstructed conversation exceeds model window, return only the latest N messages that fit
 - [ ] Conversation compaction — summarize old conversations into fact-sized digests for long-term retention
 
@@ -956,6 +956,6 @@ Cross-client conversation portability. A background daemon watches local convers
 - **store_fact reliability.** How consistently do different models call store_fact when instructed via tool descriptions and rules files? What is the miss rate for important facts?
 - **Arweave gateway reliability.** If a gateway misses a transaction or goes down, the index is temporarily incomplete. Is querying multiple gateways sufficient, or is a fallback mechanism needed?
 - **Turbo dependency.** Turbo simplifies payments and uploads (and provides the free tier), but introduces a dependency on ArDrive's service. If Turbo goes down, uploads fail until an alternative is used. The `StorageBackend` interface allows swapping to direct Arweave transactions as a fallback.
-- **Free tier durability.** Turbo's sub-100 KiB free uploads are a business decision, not a protocol guarantee. If ArDrive removes this subsidy, Sharme still works but users would need to fund a Turbo balance. The shard cap mechanism still provides value by keeping per-upload costs minimal.
+- **Free tier durability.** Turbo's sub-100 KiB free uploads are a business decision, not a protocol guarantee. If ArDrive removes this subsidy, SingleContext still works but users would need to fund a Turbo balance. The shard cap mechanism still provides value by keeping per-upload costs minimal.
 - **Conversation file format stability.** Cursor and Claude Code store transcripts in undocumented local file formats. These can change without notice on any update. Parsers must be treated as fragile adapters that may need patching after client updates.
 - **Conversation volume.** A single Claude Code session can be 1-2 MB. Heavy usage could produce 10-20 MB/day of raw transcripts. At 90 KiB/shard, that's ~150+ shards/day. All free individually, but the permanent storage footprint grows fast. Conversation compaction (summarization) is the long-term mitigation.

@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { platform, homedir } from "os";
 import { join } from "path";
 
-const SERVICE = "sharme";
+const SERVICE = "singlecontext";
 const ACCOUNT = "passphrase";
 
 /** Path to the user's login keychain on macOS */
@@ -36,7 +36,7 @@ export function keychainStore(passphrase: string): void {
     );
   } else if (os === "linux") {
     execSync(
-      `echo -n "${escapeShell(passphrase)}" | secret-tool store --label="Sharme passphrase" service "${SERVICE}" account "${ACCOUNT}"`,
+      `echo -n "${escapeShell(passphrase)}" | secret-tool store --label="SingleContext passphrase" service "${SERVICE}" account "${ACCOUNT}"`,
       { stdio: "ignore" }
     );
   } else if (os === "win32") {

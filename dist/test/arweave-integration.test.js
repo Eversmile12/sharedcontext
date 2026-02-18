@@ -2,10 +2,10 @@
  * Integration test: actually uploads to Arweave via Turbo testnet,
  * then queries and downloads it back.
  *
- * Requires: SHARME_TEST_PRIVATE_KEY env var (hex, 0x-prefixed secp256k1 key)
+ * Requires: SINGLECONTEXT_TEST_PRIVATE_KEY env var (hex, 0x-prefixed secp256k1 key)
  * with Base Sepolia ETH funded on Turbo.
  *
- * Run: SHARME_TEST_PRIVATE_KEY=0x... node --test dist/test/arweave-integration.test.js
+ * Run: SINGLECONTEXT_TEST_PRIVATE_KEY=0x... node --test dist/test/arweave-integration.test.js
  */
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import { createShard, serializeShard, deserializeShard, replayShards } from "../
 import { buildShardTags } from "../core/sync.js";
 import { TurboBackend } from "../core/backends/turbo.js";
 import { queryShards, downloadShard } from "../core/arweave.js";
-const TEST_KEY = process.env.SHARME_TEST_PRIVATE_KEY;
+const TEST_KEY = process.env.SINGLECONTEXT_TEST_PRIVATE_KEY;
 // Skip the entire suite if no key is provided
 const run = TEST_KEY ? describe : describe.skip;
 run("arweave integration (testnet)", () => {

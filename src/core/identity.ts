@@ -28,7 +28,7 @@ export function generateKeypair(): Keypair {
 export function deriveKeypairFromPhrase(phrase: string): Keypair {
   const encoder = new TextEncoder();
   const ikm = encoder.encode(phrase);
-  const salt = encoder.encode("sharme-identity-v1");
+  const salt = encoder.encode("singlecontext-identity-v1");
   const info = encoder.encode("secp256k1-private-key");
 
   // HKDF: extract-then-expand to get 32 bytes for the private key

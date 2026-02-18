@@ -5,7 +5,7 @@ import { getDbPath } from "./init.js";
 export function deleteCommand(options: { key: string }): void {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
-    console.error("Sharme not initialized. Run `sharme init` first.");
+    console.error("SingleContext not initialized. Run `singlecontext init` first.");
     process.exit(1);
   }
 

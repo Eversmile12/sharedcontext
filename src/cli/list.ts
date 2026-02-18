@@ -74,7 +74,7 @@ export async function listConversationsCommand(
 export function listContextCommand(options: ListContextOptions): void {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
-    console.error("Sharme not initialized. Run `sharme init` first.");
+    console.error("SingleContext not initialized. Run `singlecontext init` first.");
     process.exit(1);
   }
 

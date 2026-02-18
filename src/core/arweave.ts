@@ -12,11 +12,11 @@ const DEFAULT_DATA_ENDPOINTS = [
   "https://g8way.io",
 ];
 const ARWEAVE_GQL_ENDPOINTS = parseEndpointList(
-  process.env.SHARME_ARWEAVE_GQLS,
+  process.env.SINGLECONTEXT_ARWEAVE_GQLS,
   DEFAULT_GQL_ENDPOINTS
 );
 const ARWEAVE_DATA_ENDPOINTS = parseEndpointList(
-  process.env.SHARME_ARWEAVE_DATAS,
+  process.env.SINGLECONTEXT_ARWEAVE_DATAS,
   DEFAULT_DATA_ENDPOINTS
 );
 const GQL_PAGE_SIZE = 1000;
@@ -67,7 +67,7 @@ export async function queryShards(walletAddress: string): Promise<ShardInfo[]> {
     query($wallet: String!, $first: Int!, $after: String) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["sharme"] },
+          { name: "App-Name", values: ["singlecontext"] },
           { name: "Wallet", values: [$wallet] }
         ],
         sort: HEIGHT_ASC,
@@ -198,7 +198,7 @@ export async function queryConversationChunks(
     query($wallet: String!, $first: Int!, $after: String) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["sharme"] },
+          { name: "App-Name", values: ["singlecontext"] },
           { name: "Wallet", values: [$wallet] },
           { name: "Type", values: ["conversation"] }
         ],
@@ -334,7 +334,7 @@ export async function queryConversationShare(
     query($shareId: String!) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["sharme"] },
+          { name: "App-Name", values: ["singlecontext"] },
           { name: "Type", values: ["conversation-share"] },
           { name: "Share-Id", values: [$shareId] }
         ],

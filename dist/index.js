@@ -11,12 +11,12 @@ import { shareCommand } from "./cli/share.js";
 import { syncCommand } from "./cli/sync.js";
 const program = new Command();
 program
-    .name("sharme")
+    .name("singlecontext")
     .description("Sovereign, portable LLM context layer")
-    .version("0.1.1");
+    .version("0.1.2");
 program
     .command("init")
-    .description("Initialize Sharme with a new 12-word recovery phrase")
+    .description("Initialize SingleContext with a new 12-word recovery phrase")
     .option("--existing", "Restore from an existing recovery phrase")
     .action(async (options) => {
     if (options.existing) {

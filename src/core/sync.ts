@@ -29,7 +29,7 @@ export function buildShardTags(
   signature: string
 ): Tag[] {
   return [
-    { name: "App-Name", value: "sharme" },
+    { name: "App-Name", value: "singlecontext" },
     { name: "Wallet", value: walletAddress },
     { name: "Version", value: String(version) },
     { name: "Type", value: type },
@@ -70,7 +70,7 @@ export async function pushIdentity(
 ): Promise<string> {
   const signature = signShard(encryptedPrivateKey, identityPrivateKey);
   const tags: Tag[] = [
-    { name: "App-Name", value: "sharme" },
+    { name: "App-Name", value: "singlecontext" },
     { name: "Wallet", value: walletAddress },
     { name: "Type", value: "identity" },
     { name: "Salt", value: Buffer.from(salt).toString("hex") },
@@ -95,7 +95,7 @@ export async function pullAndReconstruct(
   if (!identity) {
     throw new Error(
       "No identity found on Arweave for this wallet. " +
-        "Make sure you ran `sharme init` on another device and pushed the identity."
+        "Make sure you ran `singlecontext init` on another device and pushed the identity."
     );
   }
 
@@ -240,7 +240,7 @@ export async function pushConversationDelta(
     const chunk = chunks[i];
     const signature = signShard(chunk, privateKey);
     const tags: Tag[] = [
-      { name: "App-Name", value: "sharme" },
+      { name: "App-Name", value: "singlecontext" },
       { name: "Wallet", value: walletAddress },
       { name: "Type", value: "conversation" },
       { name: "Client", value: conversation.client },

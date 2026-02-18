@@ -26,7 +26,7 @@ export async function identityCommand(options: IdentityCommandOptions = {}): Pro
   const dbPath = getDbPath();
 
   if (!existsSync(dbPath)) {
-    console.error("Sharme not initialized. Run `sharme init` first.");
+    console.error("SingleContext not initialized. Run `singlecontext init` first.");
     process.exit(1);
   }
 
@@ -37,7 +37,7 @@ export async function identityCommand(options: IdentityCommandOptions = {}): Pro
   const identityPushed = getMeta(db, "identity_pushed");
   db.close();
 
-  console.log("Sharme Identity\n");
+  console.log("SingleContext Identity\n");
   console.log(`  Wallet:          ${walletAddress}`);
   console.log(`  Local version:   ${currentVersion}`);
   console.log(`  Pushed version:  ${lastPushed}`);

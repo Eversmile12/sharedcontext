@@ -16,7 +16,7 @@ import { ConversationWatcher } from "../core/watcher.js";
 const SYNC_INTERVAL_MS = 60_000; // 1 minute
 let db;
 /**
- * Start the Sharme MCP server.
+ * Start the SingleContext MCP server.
  * Communicates over stdio. Cursor spawns this as a child process.
  */
 export async function startMcpServer() {
@@ -24,10 +24,10 @@ export async function startMcpServer() {
     const keychainPassphrase = keychainLoad();
     const passphrase = keychainPassphrase ?? null;
     if (!passphrase) {
-        process.stderr.write("Sharme: no passphrase found in system keychain. Run `sharme init` first.\n");
+        process.stderr.write("SingleContext: no passphrase found in system keychain. Run `singlecontext init` first.\n");
         process.exit(1);
     }
-    process.stderr.write("Sharme: passphrase loaded from system keychain\n");
+    process.stderr.write("SingleContext: passphrase loaded from system keychain\n");
     const dbPath = getDbPath();
     db = openDatabase(dbPath);
     // Detect current project scope from working directory
@@ -35,8 +35,8 @@ export async function startMcpServer() {
     const projectName = cwd.split("/").pop() ?? "unknown";
     const defaultScope = `project:${projectName}`;
     const server = new McpServer({
-        name: "sharme",
-        version: "0.1.1",
+        name: "singlecontext",
+        version: "0.1.2",
     });
     // ── store_fact ────────────────────────────────────────
     server.tool("store_fact", "Store an important fact for long-term memory. Call this when the user expresses a preference, makes a project decision, shares architectural context, or provides information that should be remembered across sessions.", {
@@ -138,7 +138,7 @@ export async function startMcpServer() {
         };
     });
     // ── recall_conversation ─────────────────────────────
-    server.tool("recall_conversation", "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. Sharme watches local conversation files and syncs them to Arweave.", {
+    server.tool("recall_conversation", "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. SingleContext watches local conversation files and syncs them to Arweave.", {
         topic: z
             .string()
             .describe("What the conversation was about. Keywords like 'keyboard layout', 'auth setup', 'database migration'."),
@@ -247,7 +247,7 @@ export async function startMcpServer() {
             const identityKey = loadIdentityPrivateKey(encryptionKey);
             const pubKey = publicKeyFromPrivate(identityKey);
             const walletAddress = addressFromPublicKey(pubKey);
-            const useTestnet = process.env.SHARME_TESTNET === "true";
+            const useTestnet = process.env.SINGLECONTEXT_TESTNET === "true";
             const backend = new TurboBackend({
                 privateKeyHex: Buffer.from(identityKey).toString("hex"),
                 testnet: useTestnet,
@@ -265,22 +265,22 @@ export async function startMcpServer() {
                     if (txIds.length === 0)
                         return;
                     setMeta(db, stateKey, String(conversation.messages.length));
-                    process.stderr.write(`Sharme: conversation synced [${conversation.client}/${conversation.project}] ${txIds.length} chunk(s), cursor=${conversation.messages.length}\n`);
+                    process.stderr.write(`SingleContext: conversation synced [${conversation.client}/${conversation.project}] ${txIds.length} chunk(s), cursor=${conversation.messages.length}\n`);
                 }
                 catch (err) {
-                    process.stderr.write(`Sharme: conversation sync failed: ${err instanceof Error ? err.message : String(err)}\n`);
+                    process.stderr.write(`SingleContext: conversation sync failed: ${err instanceof Error ? err.message : String(err)}\n`);
                 }
             }, 30_000);
             watcher.start();
-            process.stderr.write(`Sharme: auto-sync every ${SYNC_INTERVAL_MS / 1000}s → Arweave (${useTestnet ? "testnet" : "mainnet"})\n`);
-            process.stderr.write("Sharme: conversation watcher active (Cursor + Claude Code)\n");
+            process.stderr.write(`SingleContext: auto-sync every ${SYNC_INTERVAL_MS / 1000}s → Arweave (${useTestnet ? "testnet" : "mainnet"})\n`);
+            process.stderr.write("SingleContext: conversation watcher active (Cursor + Claude Code)\n");
         }
         else {
-            process.stderr.write("Sharme: no identity found, auto-sync disabled. Run `sharme init` first.\n");
+            process.stderr.write("SingleContext: no identity found, auto-sync disabled. Run `singlecontext init` first.\n");
         }
     }
     catch (err) {
-        process.stderr.write(`Sharme: auto-sync disabled (${err instanceof Error ? err.message : "key error"}). Facts are stored locally only.\n`);
+        process.stderr.write(`SingleContext: auto-sync disabled (${err instanceof Error ? err.message : "key error"}). Facts are stored locally only.\n`);
     }
     // ── Connect stdio transport ───────────────────────────
     const transport = new StdioServerTransport();
@@ -318,14 +318,14 @@ async function syncDirtyFacts(db, encryptionKey, identityKey, walletAddress, bac
             const encrypted = encrypt(serialized, encryptionKey);
             const txId = await pushShard(encrypted, shard.shard_version, "delta", walletAddress, identityKey, backend);
             lastVersion = shard.shard_version;
-            process.stderr.write(`Sharme: synced v${shard.shard_version} (${operations.length} ops, ${encrypted.length}B) → ${txId}\n`);
+            process.stderr.write(`SingleContext: synced v${shard.shard_version} (${operations.length} ops, ${encrypted.length}B) → ${txId}\n`);
         }
         clearDirtyState(db);
         setMeta(db, "current_version", String(lastVersion));
         setMeta(db, "last_pushed_version", String(lastVersion));
     }
     catch (err) {
-        process.stderr.write(`Sharme: sync failed, will retry: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.stderr.write(`SingleContext: sync failed, will retry: ${err instanceof Error ? err.message : String(err)}\n`);
     }
 }
 //# sourceMappingURL=server.js.map

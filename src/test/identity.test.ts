@@ -37,17 +37,17 @@ describe("identity", () => {
 
   describe("deriveKeypairFromPhrase", () => {
     it("returns 32-byte private key", () => {
-      const kp = deriveKeypairFromPhrase("test phrase for sharme");
+      const kp = deriveKeypairFromPhrase("test phrase for singlecontext");
       assert.equal(kp.privateKey.length, 32);
     });
 
     it("returns 33-byte compressed public key", () => {
-      const kp = deriveKeypairFromPhrase("test phrase for sharme");
+      const kp = deriveKeypairFromPhrase("test phrase for singlecontext");
       assert.equal(kp.publicKey.length, 33);
     });
 
     it("returns 0x-prefixed 42-char address", () => {
-      const kp = deriveKeypairFromPhrase("test phrase for sharme");
+      const kp = deriveKeypairFromPhrase("test phrase for singlecontext");
       assert.ok(kp.address.startsWith("0x"));
       assert.equal(kp.address.length, 42);
     });

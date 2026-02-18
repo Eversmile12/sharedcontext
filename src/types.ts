@@ -1,7 +1,7 @@
 export interface Fact {
   id: string;
   scope: string; // "global" | "project:<name>"
-  key: string; // unique identifier like "sharme:storage:backend"
+  key: string; // unique identifier like "singlecontext:storage:backend"
   value: string;
   tags: string[];
   confidence: number;
