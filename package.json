@@ -22,8 +22,7 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "test": "tsc && node --test dist/test/crypto.test.js dist/test/db.test.js dist/test/passphrase.test.js dist/test/shard.test.js dist/test/engine.test.js dist/test/identity.test.js dist/test/sync.test.js dist/test/share-token.test.js",
-    "test:arweave": "tsc && node --test dist/test/arweave-integration.test.js",
-    "demo": "tsc && rm -rf dist/demo/public && cp -r src/demo/public dist/demo/public && node dist/demo/server.js"
+    "test:arweave": "tsc && node --test dist/test/arweave-integration.test.js"
   },
   "license": "MIT",
   "dependencies": {

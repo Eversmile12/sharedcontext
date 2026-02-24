@@ -260,15 +260,6 @@ export async function pushConversationDelta(
   return txIds;
 }
 
-export interface PulledConversation {
-  id: string;
-  client: "cursor" | "claude-code";
-  project: string;
-  messages: Array<{ role: "user" | "assistant" | "tool"; content: string; timestamp?: string }>;
-  startedAt: string;
-  updatedAt: string;
-}
-
 /**
  * Pull and reconstruct conversations from Arweave conversation chunks.
  * Rebuilds sessions by stitching chunk groups and then ordering by segment offset.
@@ -276,7 +267,7 @@ export interface PulledConversation {
 export async function pullConversations(
   walletAddress: string,
   encryptionKey: Uint8Array
-): Promise<PulledConversation[]> {
+): Promise<Conversation[]> {
   const infos = await queryConversationChunks(walletAddress);
   if (infos.length === 0) return [];
 
@@ -344,7 +335,7 @@ export async function pullConversations(
           ? parsed.offset
           : null;
       const messages = Array.isArray(parsed.messages)
-        ? (parsed.messages as PulledConversation["messages"])
+        ? (parsed.messages as Conversation["messages"])
         : null;
 
       // Strict future-only schema validation.
@@ -378,7 +369,7 @@ export async function pullConversations(
 
   if (segmentPayloads.length === 0) return [];
 
-  const sessions = new Map<string, PulledConversation>();
+  const sessions = new Map<string, Conversation>();
   const perSessionOffsets = new Map<string, Set<number>>();
 
   segmentPayloads.sort((a, b) => {

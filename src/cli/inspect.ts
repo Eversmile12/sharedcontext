@@ -1,14 +1,8 @@
-import { existsSync } from "fs";
 import { openDatabase, getAllFacts, getFactsByScope } from "../core/db.js";
-import { getDbPath } from "./init.js";
+import { ensureInitialized } from "./util.js";
 
 export function inspectCommand(options: { scope?: string }): void {
-  const dbPath = getDbPath();
-  if (!existsSync(dbPath)) {
-    console.error("SingleContext not initialized. Run `singlecontext init` first.");
-    process.exit(1);
-  }
-
+  const dbPath = ensureInitialized();
   const db = openDatabase(dbPath);
   const facts = options.scope
     ? getFactsByScope(db, options.scope)

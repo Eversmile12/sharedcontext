@@ -32,7 +32,6 @@ export function parseCursorTranscript(
   let currentRole: "user" | "assistant" | null = null;
   let currentContent: string[] = [];
   let inToolBlock = false;
-  let inUserQuery = false;
 
   function flush() {
     if (currentRole && currentContent.length > 0) {
@@ -52,7 +51,6 @@ export function parseCursorTranscript(
       flush();
       currentRole = "user";
       inToolBlock = false;
-      inUserQuery = false;
       continue;
     }
 
@@ -79,13 +77,7 @@ export function parseCursorTranscript(
       continue;
     }
 
-    // Strip <user_query> / </user_query> tags
-    if (trimmed === "<user_query>") {
-      inUserQuery = true;
-      continue;
-    }
-    if (trimmed === "</user_query>") {
-      inUserQuery = false;
+    if (trimmed === "<user_query>" || trimmed === "</user_query>") {
       continue;
     }
 
@@ -103,18 +95,7 @@ export function parseCursorTranscript(
 
   flush();
 
-  // Merge consecutive same-role messages (common in Cursor transcripts
-  // where assistant has multiple tool-call-interrupted segments)
-  const merged: ConversationMessage[] = [];
-  for (const msg of messages) {
-    const last = merged[merged.length - 1];
-    if (last && last.role === msg.role) {
-      last.content += "\n\n" + msg.content;
-    } else {
-      merged.push({ ...msg });
-    }
-  }
-
+  const merged = mergeConsecutiveMessages(messages);
   const now = new Date().toISOString();
   return {
     id: fileId,
@@ -124,4 +105,24 @@ export function parseCursorTranscript(
     startedAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * Merge consecutive messages with the same role into a single message.
+ * Common in both Cursor and Claude Code transcripts where tool calls
+ * split assistant responses into multiple segments.
+ */
+export function mergeConsecutiveMessages(
+  messages: ConversationMessage[]
+): ConversationMessage[] {
+  const merged: ConversationMessage[] = [];
+  for (const msg of messages) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += "\n\n" + msg.content;
+    } else {
+      merged.push({ ...msg });
+    }
+  }
+  return merged;
 }

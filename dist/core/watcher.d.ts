@@ -9,6 +9,10 @@ export interface ConversationFileRef {
     fileId: string;
 }
 /**
+ * Discover all conversation files across Cursor and Claude Code directories.
+ */
+export declare function discoverConversationFiles(): ConversationFileRef[];
+/**
  * ConversationWatcher polls known Cursor and Claude Code directories
  * for new or updated conversation files. When changes are detected,
  * it parses only the new content and fires the callback.
@@ -23,11 +27,5 @@ export declare class ConversationWatcher {
     stop(): void;
     private poll;
     private checkFile;
-    /** Public utility for one-shot discovery (used by recall tool fallback). */
-    discoverAllConversationFiles(): ConversationFileRef[];
-    /** Discover Cursor agent transcript files. */
-    private discoverCursorFiles;
-    /** Discover Claude Code conversation files. */
-    private discoverClaudeCodeFiles;
 }
 //# sourceMappingURL=watcher.d.ts.map

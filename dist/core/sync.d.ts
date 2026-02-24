@@ -27,23 +27,11 @@ export declare function pullAndReconstruct(walletAddress: string, passphrase: st
  * Uses Offset/Count tags so retrieval can rebuild full sessions.
  */
 export declare function pushConversationDelta(conversation: Conversation, encryptionKey: Uint8Array, walletAddress: string, privateKey: Uint8Array, backend: StorageBackend, lastSyncedCount: number): Promise<string[]>;
-export interface PulledConversation {
-    id: string;
-    client: "cursor" | "claude-code";
-    project: string;
-    messages: Array<{
-        role: "user" | "assistant" | "tool";
-        content: string;
-        timestamp?: string;
-    }>;
-    startedAt: string;
-    updatedAt: string;
-}
 /**
  * Pull and reconstruct conversations from Arweave conversation chunks.
  * Rebuilds sessions by stitching chunk groups and then ordering by segment offset.
  */
-export declare function pullConversations(walletAddress: string, encryptionKey: Uint8Array): Promise<PulledConversation[]>;
+export declare function pullConversations(walletAddress: string, encryptionKey: Uint8Array): Promise<Conversation[]>;
 /**
  * Check if local state is behind Arweave.
  * Returns the remote version, or null if no shards exist.

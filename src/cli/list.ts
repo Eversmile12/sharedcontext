@@ -1,17 +1,17 @@
 import { existsSync, readFileSync } from "fs";
-import { ConversationWatcher } from "../core/watcher.js";
+import { discoverConversationFiles } from "../core/watcher.js";
 import { parseCursorTranscript } from "../core/parsers/cursor.js";
 import { parseClaudeCodeJSONL } from "../core/parsers/claude-code.js";
 import { pullConversations } from "../core/sync.js";
 import { keychainLoad } from "../core/keychain.js";
-import { loadKey, loadIdentityPrivateKey, getDbPath, getIdentityPath } from "./init.js";
-import { addressFromPublicKey, publicKeyFromPrivate } from "../core/identity.js";
+import { getDbPath, getIdentityPath } from "./init.js";
 import {
   getAllFacts,
   getFactsByScope,
   getSharedConversationImports,
   openDatabase,
 } from "../core/db.js";
+import { ensureInitialized, resolveIdentity } from "./util.js";
 import type { Conversation } from "../types.js";
 
 interface ListConversationsOptions {
@@ -72,12 +72,7 @@ export async function listConversationsCommand(
 }
 
 export function listContextCommand(options: ListContextOptions): void {
-  const dbPath = getDbPath();
-  if (!existsSync(dbPath)) {
-    console.error("SingleContext not initialized. Run `singlecontext init` first.");
-    process.exit(1);
-  }
-
+  const dbPath = ensureInitialized();
   const db = openDatabase(dbPath);
   const facts = options.scope ? getFactsByScope(db, options.scope) : getAllFacts(db);
   db.close();
@@ -141,8 +136,7 @@ export async function discoverConversations(options?: {
 }
 
 function loadLocalConversations(): Conversation[] {
-  const watcher = new ConversationWatcher(() => {}, 999999);
-  const files = watcher.discoverAllConversationFiles();
+  const files = discoverConversationFiles();
   const conversations: Conversation[] = [];
 
   for (const file of files) {
@@ -170,10 +164,7 @@ async function loadRemoteConversations(): Promise<Conversation[]> {
   }
 
   try {
-    const encryptionKey = loadKey(passphrase);
-    const identityKey = loadIdentityPrivateKey(encryptionKey);
-    const pubKey = publicKeyFromPrivate(identityKey);
-    const walletAddress = addressFromPublicKey(pubKey);
+    const { encryptionKey, walletAddress } = resolveIdentity(passphrase);
     return await pullConversations(walletAddress, encryptionKey);
   } catch {
     return [];

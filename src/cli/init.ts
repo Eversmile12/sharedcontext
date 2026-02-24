@@ -1,7 +1,6 @@
 import { mkdirSync, existsSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { createInterface } from "readline";
 import { deriveKey, generateSalt, encrypt, decrypt } from "../core/crypto.js";
 import { openDatabase, setMeta } from "../core/db.js";
 import { deriveKeypairFromPhrase } from "../core/identity.js";
@@ -15,24 +14,12 @@ import {
 } from "../core/passphrase.js";
 import { pullAndReconstruct } from "../core/sync.js";
 import { fetchIdentity } from "../core/arweave.js";
+import { prompt, toErrorMessage } from "./util.js";
 
 const SINGLECONTEXT_DIR = process.env.SINGLECONTEXT_HOME || join(homedir(), ".singlecontext");
 const DB_PATH = join(SINGLECONTEXT_DIR, "singlecontext.db");
 const SALT_PATH = join(SINGLECONTEXT_DIR, "salt");
 const IDENTITY_PATH = join(SINGLECONTEXT_DIR, "identity.enc");
-
-/**
- * Prompt for a single line of input (works in both interactive and piped mode).
- */
-function prompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stderr });
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
 
 /**
  * Initialize a new SingleContext instance.
@@ -47,9 +34,7 @@ export async function initCommand(): Promise<void> {
 
   console.log("Initializing SingleContext...\n");
 
-  // Create directories
   mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
-  mkdirSync(join(SINGLECONTEXT_DIR, "shards"), { recursive: true });
 
   // Generate 12-word recovery phrase
   const words = generatePhrase();
@@ -93,7 +78,7 @@ export async function initCommand(): Promise<void> {
 
   // Generate random salt for AES key derivation (stored locally + on Arweave)
   const salt = generateSalt();
-  writeFileSync(SALT_PATH, Buffer.from(salt));
+  writeFileSync(SALT_PATH, Buffer.from(salt), { mode: 0o600 });
 
   console.log("Deriving encryption key (this takes a few seconds)...");
   const key = deriveKey(phrase, salt);
@@ -101,7 +86,7 @@ export async function initCommand(): Promise<void> {
 
   // Encrypt the identity private key with the derived AES key
   const encryptedPrivateKey = encrypt(keypair.privateKey, key);
-  writeFileSync(IDENTITY_PATH, encryptedPrivateKey);
+  writeFileSync(IDENTITY_PATH, encryptedPrivateKey, { mode: 0o600 });
 
   // Create database
   const db = openDatabase(DB_PATH);
@@ -115,16 +100,12 @@ export async function initCommand(): Promise<void> {
     keychainStore(phrase);
     console.log("Recovery phrase stored in system keychain.");
   } catch (err) {
-    console.warn(
-      "Could not store in keychain:",
-      err instanceof Error ? err.message : String(err)
-    );
+    console.warn("Could not store in keychain:", toErrorMessage(err));
     console.warn("Without keychain storage, background MCP startup will fail.");
   }
 
   console.log("\nSingleContext initialized at ~/.singlecontext/");
   console.log("  Database: ~/.singlecontext/singlecontext.db");
-  console.log("  Shards:   ~/.singlecontext/shards/");
   console.log("  Identity: ~/.singlecontext/identity.enc");
   console.log(`\n  Wallet:   ${keypair.address}`);
   printAutoSetupSummary();
@@ -160,9 +141,7 @@ export async function initExistingCommand(): Promise<void> {
   const keypair = deriveKeypairFromPhrase(phrase);
   console.log(`Wallet: ${keypair.address}`);
 
-  // Create directories
   mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
-  mkdirSync(join(SINGLECONTEXT_DIR, "shards"), { recursive: true });
 
   console.log("\nQuerying Arweave and reconstructing local state...");
 
@@ -176,8 +155,8 @@ export async function initExistingCommand(): Promise<void> {
         "Recovery failed: identity transaction not found on Arweave."
       );
     }
-    writeFileSync(SALT_PATH, Buffer.from(identity.salt));
-    writeFileSync(IDENTITY_PATH, identity.encryptedPrivateKey);
+    writeFileSync(SALT_PATH, Buffer.from(identity.salt), { mode: 0o600 });
+    writeFileSync(IDENTITY_PATH, identity.encryptedPrivateKey, { mode: 0o600 });
 
     // Sanity check: recovered encrypted key must decrypt to phrase-derived identity key.
     const key = deriveKey(phrase, identity.salt);
@@ -200,10 +179,7 @@ export async function initExistingCommand(): Promise<void> {
     keychainStore(phrase);
     console.log("Recovery phrase stored in system keychain.");
   } catch (err) {
-    console.warn(
-      "Could not store in keychain:",
-      err instanceof Error ? err.message : String(err)
-    );
+    console.warn("Could not store in keychain:", toErrorMessage(err));
   }
 
   console.log("\nSingleContext restored at ~/.singlecontext/");
@@ -241,14 +217,6 @@ export function getSingleContextDir(): string {
 
 export function getDbPath(): string {
   return DB_PATH;
-}
-
-export function getShardsDir(): string {
-  return join(SINGLECONTEXT_DIR, "shards");
-}
-
-export function getSaltPath(): string {
-  return SALT_PATH;
 }
 
 export function getIdentityPath(): string {

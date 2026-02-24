@@ -30,6 +30,10 @@ export interface ConversationShareInfo {
     timestamp: string;
     signature: string | null;
 }
+export interface TransactionTagInfo {
+    txId: string;
+    tags: Map<string, string>;
+}
 /**
  * Query Arweave for all shards belonging to a wallet.
  * Returns them sorted by version ascending.
@@ -45,6 +49,10 @@ export declare function queryConversationChunks(walletAddress: string): Promise<
  * Returns the newest matching transaction.
  */
 export declare function queryConversationShare(shareId: string): Promise<ConversationShareInfo | null>;
+/**
+ * Fetch a single transaction's tags by tx id.
+ */
+export declare function queryTransactionTagsById(txId: string): Promise<TransactionTagInfo | null>;
 /**
  * Download a shard's raw data from Arweave.
  */

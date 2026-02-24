@@ -53,6 +53,11 @@ export interface ConversationShareInfo {
   signature: string | null;
 }
 
+export interface TransactionTagInfo {
+  txId: string;
+  tags: Map<string, string>;
+}
+
 /**
  * Query Arweave for all shards belonging to a wallet.
  * Returns them sorted by version ascending.
@@ -395,6 +400,53 @@ export async function queryConversationShare(
 }
 
 /**
+ * Fetch a single transaction's tags by tx id.
+ */
+export async function queryTransactionTagsById(
+  txId: string
+): Promise<TransactionTagInfo | null> {
+  const query = `
+    query($id: ID!) {
+      transactions(ids: [$id]) {
+        edges {
+          node {
+            id
+            tags { name value }
+          }
+        }
+      }
+    }
+  `;
+
+  const json = (await gqlRequest({
+    query,
+    variables: { id: txId },
+  })) as {
+    data?: {
+      transactions?: {
+        edges?: Array<{
+          node: { id: string; tags: Array<{ name: string; value: string }> };
+        }>;
+      };
+    };
+    errors?: Array<{ message?: string }>;
+  };
+
+  if (json.errors && json.errors.length > 0) {
+    const msg = json.errors.map((e) => e.message ?? "unknown").join("; ");
+    throw new Error(`Arweave GraphQL returned errors: ${msg}`);
+  }
+
+  const node = json.data?.transactions?.edges?.[0]?.node;
+  if (!node) return null;
+
+  return {
+    txId: node.id,
+    tags: new Map(node.tags.map((t) => [t.name, t.value])),
+  };
+}
+
+/**
  * Download a shard's raw data from Arweave.
  */
 export async function downloadShard(txId: string, maxBytes?: number): Promise<Uint8Array> {
@@ -457,35 +509,10 @@ export async function fetchIdentity(
     return b.txId.localeCompare(a.txId);
   })[0];
 
-  // Salt is stored as a hex string in tags
-  const query = `
-    query {
-      transactions(ids: ["${identityTx.txId}"]) {
-        edges {
-          node {
-            id
-            tags { name value }
-          }
-        }
-      }
-    }
-  `;
+  const txMeta = await queryTransactionTagsById(identityTx.txId);
+  if (!txMeta) return null;
 
-  const json = (await gqlRequest({ query })) as {
-    data: {
-      transactions: {
-        edges: Array<{
-          node: { id: string; tags: Array<{ name: string; value: string }> };
-        }>;
-      };
-    };
-  };
-
-  const edge = json.data.transactions.edges[0];
-  if (!edge) return null;
-
-  const tagMap = new Map(edge.node.tags.map((t) => [t.name, t.value]));
-  const saltHex = tagMap.get("Salt");
+  const saltHex = txMeta.tags.get("Salt");
   if (!saltHex) return null;
 
   const salt = Buffer.from(saltHex, "hex");

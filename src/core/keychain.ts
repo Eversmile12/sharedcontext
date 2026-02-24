@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { platform, homedir } from "os";
 import { join } from "path";
 
@@ -23,29 +23,38 @@ export function keychainStore(passphrase: string): void {
     const kc = loginKeychain();
     // Delete existing entry first (add-generic-password fails if it exists)
     try {
-      execSync(
-        `security delete-generic-password -s "${SERVICE}" -a "${ACCOUNT}" "${kc}" 2>/dev/null`,
+      execFileSync(
+        "security",
+        ["delete-generic-password", "-s", SERVICE, "-a", ACCOUNT, kc],
         { stdio: "ignore" }
       );
     } catch {
       // Fine — didn't exist yet
     }
-    execSync(
-      `security add-generic-password -s "${SERVICE}" -a "${ACCOUNT}" -w "${escapeShell(passphrase)}" "${kc}"`,
+    execFileSync(
+      "security",
+      ["add-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w", passphrase, kc],
       { stdio: "ignore" }
     );
   } else if (os === "linux") {
-    execSync(
-      `echo -n "${escapeShell(passphrase)}" | secret-tool store --label="SingleContext passphrase" service "${SERVICE}" account "${ACCOUNT}"`,
-      { stdio: "ignore" }
+    execFileSync(
+      "secret-tool",
+      ["store", "--label=SingleContext passphrase", "service", SERVICE, "account", ACCOUNT],
+      { stdio: ["pipe", "ignore", "ignore"], input: passphrase }
     );
   } else if (os === "win32") {
-    // PowerShell: store as a generic credential
+    // Read passphrase from stdin to avoid putting it in command args.
     const ps = `
-      $cred = New-Object System.Management.Automation.PSCredential("${ACCOUNT}", (ConvertTo-SecureString "${escapeShell(passphrase)}" -AsPlainText -Force));
-      New-StoredCredential -Target "${SERVICE}" -UserName "${ACCOUNT}" -Password "${escapeShell(passphrase)}" -Type Generic -Persist LocalMachine
+      $pw = [Console]::In.ReadToEnd()
+      if ($pw.EndsWith([Environment]::NewLine)) { $pw = $pw.Substring(0, $pw.Length - [Environment]::NewLine.Length) }
+      if ($pw.EndsWith("\`n")) { $pw = $pw.Substring(0, $pw.Length - 1) }
+      New-StoredCredential -Target "${SERVICE}" -UserName "${ACCOUNT}" -Password $pw -Type Generic -Persist LocalMachine
     `.trim();
-    execSync(`powershell -Command "${ps}"`, { stdio: "ignore" });
+    execFileSync(
+      "powershell",
+      ["-NoProfile", "-Command", ps],
+      { stdio: ["pipe", "ignore", "ignore"], input: passphrase }
+    );
   } else {
     throw new Error(
       `Unsupported platform: ${os}. In production, prefer a supported OS keychain.`
@@ -63,23 +72,33 @@ export function keychainLoad(): string | null {
   try {
     if (os === "darwin") {
       const kc = loginKeychain();
-      const result = execSync(
-        `security find-generic-password -s "${SERVICE}" -a "${ACCOUNT}" -w "${kc}"`,
+      const result = execFileSync(
+        "security",
+        ["find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w", kc],
         { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }
       );
       return result.trim();
     } else if (os === "linux") {
-      const result = execSync(
-        `secret-tool lookup service "${SERVICE}" account "${ACCOUNT}"`,
+      const result = execFileSync(
+        "secret-tool",
+        ["lookup", "service", SERVICE, "account", ACCOUNT],
         { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }
       );
       return result.trim();
     } else if (os === "win32") {
-      const ps = `(Get-StoredCredential -Target "${SERVICE}").GetNetworkCredential().Password`;
-      const result = execSync(`powershell -Command "${ps}"`, {
-        encoding: "utf-8",
-        stdio: ["pipe", "pipe", "ignore"],
-      });
+      const ps = `
+        $cred = Get-StoredCredential -Target "${SERVICE}"
+        if ($null -eq $cred) { exit 1 }
+        $cred.GetNetworkCredential().Password
+      `.trim();
+      const result = execFileSync(
+        "powershell",
+        ["-NoProfile", "-Command", ps],
+        {
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "ignore"],
+        }
+      );
       return result.trim();
     }
   } catch {
@@ -99,34 +118,25 @@ export function keychainDelete(): void {
   try {
     if (os === "darwin") {
       const kc = loginKeychain();
-      execSync(
-        `security delete-generic-password -s "${SERVICE}" -a "${ACCOUNT}" "${kc}"`,
+      execFileSync(
+        "security",
+        ["delete-generic-password", "-s", SERVICE, "-a", ACCOUNT, kc],
         { stdio: "ignore" }
       );
     } else if (os === "linux") {
-      execSync(
-        `secret-tool clear service "${SERVICE}" account "${ACCOUNT}"`,
+      execFileSync(
+        "secret-tool",
+        ["clear", "service", SERVICE, "account", ACCOUNT],
         { stdio: "ignore" }
       );
     } else if (os === "win32") {
-      execSync(
-        `powershell -Command "Remove-StoredCredential -Target '${SERVICE}'"`,
+      execFileSync(
+        "powershell",
+        ["-NoProfile", "-Command", `Remove-StoredCredential -Target '${SERVICE}'`],
         { stdio: "ignore" }
       );
     }
   } catch {
     // Already gone or not found — fine
   }
-}
-
-/**
- * Escape a string for safe shell interpolation.
- */
-function escapeShell(s: string): string {
-  // Replace backslashes first, then double quotes, then backticks and dollar signs
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/`/g, "\\`")
-    .replace(/\$/g, "\\$");
 }

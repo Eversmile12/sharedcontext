@@ -2,27 +2,24 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { existsSync } from "fs";
+import { readFileSync } from "fs";
 import { openDatabase, upsertFact, deleteFact, getFact, getAllFacts, getDirtyFacts, getPendingDeletes, clearDirtyState, getMeta, setMeta, incrementAccessCount, } from "../core/db.js";
 import { recallContext, formatContext } from "../core/engine.js";
 import { createChunkedShards, serializeShard, factToUpsertOp } from "../core/shard.js";
 import { encrypt } from "../core/crypto.js";
 import { pushShard, pushConversationDelta, pullConversations } from "../core/sync.js";
-import { publicKeyFromPrivate, addressFromPublicKey, } from "../core/identity.js";
 import { TurboBackend } from "../core/backends/turbo.js";
-import { loadKey, loadIdentityPrivateKey, getDbPath, getIdentityPath } from "../cli/init.js";
+import { getDbPath } from "../cli/init.js";
 import { keychainLoad } from "../core/keychain.js";
-import { ConversationWatcher } from "../core/watcher.js";
-const SYNC_INTERVAL_MS = 60_000; // 1 minute
+import { ConversationWatcher, discoverConversationFiles } from "../core/watcher.js";
+import { parseCursorTranscript } from "../core/parsers/cursor.js";
+import { parseClaudeCodeJSONL } from "../core/parsers/claude-code.js";
+import { VERSION } from "../version.js";
+import { resolveIdentity, isIdentityAvailable, toErrorMessage, } from "../cli/util.js";
+const SYNC_INTERVAL_MS = 60_000;
 let db;
-/**
- * Start the SingleContext MCP server.
- * Communicates over stdio. Cursor spawns this as a child process.
- */
 export async function startMcpServer() {
-    // Load passphrase from keychain (required for MCP background mode).
-    const keychainPassphrase = keychainLoad();
-    const passphrase = keychainPassphrase ?? null;
+    const passphrase = keychainLoad();
     if (!passphrase) {
         process.stderr.write("SingleContext: no passphrase found in system keychain. Run `singlecontext init` first.\n");
         process.exit(1);
@@ -30,15 +27,13 @@ export async function startMcpServer() {
     process.stderr.write("SingleContext: passphrase loaded from system keychain\n");
     const dbPath = getDbPath();
     db = openDatabase(dbPath);
-    // Detect current project scope from working directory
     const cwd = process.cwd();
     const projectName = cwd.split("/").pop() ?? "unknown";
     const defaultScope = `project:${projectName}`;
     const server = new McpServer({
         name: "singlecontext",
-        version: "0.1.2",
+        version: VERSION,
     });
-    // ── store_fact ────────────────────────────────────────
     server.tool("store_fact", "Store an important fact for long-term memory. Call this when the user expresses a preference, makes a project decision, shares architectural context, or provides information that should be remembered across sessions.", {
         key: z
             .string()
@@ -55,7 +50,6 @@ export async function startMcpServer() {
             .describe("Scope: 'global' for facts useful everywhere (preferences, general knowledge). Use 'project:<name>' only for facts specific to the current project (tech stack, architecture decisions). Defaults to global."),
     }, async ({ key, value, tags, scope }) => {
         const factScope = scope ?? "global";
-        // Prefix key with scope if not already namespaced
         const fullKey = key.startsWith("global:") || key.startsWith("project:")
             ? key
             : `${factScope}:${key}`;
@@ -74,15 +68,9 @@ export async function startMcpServer() {
         };
         upsertFact(db, fact);
         return {
-            content: [
-                {
-                    type: "text",
-                    text: `Stored: ${fullKey}`,
-                },
-            ],
+            content: [{ type: "text", text: `Stored: ${fullKey}` }],
         };
     });
-    // ── recall_context ────────────────────────────────────
     server.tool("recall_context", "Recall relevant facts from long-term memory. Call this at the start of a conversation or when you need context about a topic. Returns facts ranked by relevance.", {
         topic: z
             .string()
@@ -95,7 +83,6 @@ export async function startMcpServer() {
         const searchScope = scope ?? defaultScope;
         const allFacts = getAllFacts(db);
         const results = recallContext(topic, searchScope, allFacts);
-        // Increment access counts
         for (const fact of results) {
             incrementAccessCount(db, fact.key);
         }
@@ -107,15 +94,9 @@ export async function startMcpServer() {
             };
         }
         return {
-            content: [
-                {
-                    type: "text",
-                    text: formatContext(results),
-                },
-            ],
+            content: [{ type: "text", text: formatContext(results) }],
         };
     });
-    // ── delete_fact ───────────────────────────────────────
     server.tool("delete_fact", "Delete a fact from memory. Use when information is no longer accurate or relevant.", {
         key: z.string().describe("The fact key to delete."),
     }, async ({ key }) => {
@@ -123,21 +104,15 @@ export async function startMcpServer() {
         if (!existing) {
             return {
                 content: [
-                    {
-                        type: "text",
-                        text: `No fact found with key: ${key}`,
-                    },
+                    { type: "text", text: `No fact found with key: ${key}` },
                 ],
             };
         }
         deleteFact(db, key);
         return {
-            content: [
-                { type: "text", text: `Deleted: ${key}` },
-            ],
+            content: [{ type: "text", text: `Deleted: ${key}` }],
         };
     });
-    // ── recall_conversation ─────────────────────────────
     server.tool("recall_conversation", "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. SingleContext watches local conversation files and syncs them to Arweave.", {
         topic: z
             .string()
@@ -152,35 +127,17 @@ export async function startMcpServer() {
             .describe("Project name to filter by."),
     }, async ({ topic, client, project }) => {
         const conversations = [];
-        const encryptionKey = loadKey(passphrase);
-        // Pull historical conversations from Arweave first.
-        if (existsSync(getIdentityPath())) {
+        if (isIdentityAvailable()) {
             try {
-                const identityKey = loadIdentityPrivateKey(encryptionKey);
-                const pubKey = publicKeyFromPrivate(identityKey);
-                const walletAddress = addressFromPublicKey(pubKey);
-                const remote = await pullConversations(walletAddress, encryptionKey);
-                for (const conv of remote) {
-                    conversations.push({
-                        id: conv.id,
-                        client: conv.client,
-                        project: conv.project,
-                        messages: conv.messages,
-                        startedAt: conv.startedAt,
-                        updatedAt: conv.updatedAt,
-                    });
-                }
+                const identity = resolveIdentity(passphrase);
+                const remote = await pullConversations(identity.walletAddress, identity.encryptionKey);
+                conversations.push(...remote);
             }
             catch {
                 // If remote pull fails, continue with local fallback.
             }
         }
-        // Local fallback: parse conversation files directly.
-        const watcher = new ConversationWatcher(() => { }, 999999);
-        const local = watcher.discoverAllConversationFiles();
-        const { readFileSync } = await import("fs");
-        const { parseCursorTranscript } = await import("../core/parsers/cursor.js");
-        const { parseClaudeCodeJSONL } = await import("../core/parsers/claude-code.js");
+        const local = discoverConversationFiles();
         for (const f of local) {
             if (client && client !== "any" && client !== f.client)
                 continue;
@@ -204,7 +161,6 @@ export async function startMcpServer() {
                 content: [{ type: "text", text: "No conversations found." }],
             };
         }
-        // Simple keyword search across conversations
         const keywords = topic.toLowerCase().split(/\s+/);
         const scored = conversations.map((conv) => {
             const allText = conv.messages.map((m) => m.content).join(" ").toLowerCase();
@@ -218,16 +174,14 @@ export async function startMcpServer() {
                 content: [{ type: "text", text: `No conversations matching "${topic}" found.` }],
             };
         }
-        // Budget-based truncation: ~19,200 tokens ≈ 77,000 chars (default model budget)
         const CHARS_PER_TOKEN = 4;
-        const TOKEN_BUDGET = 128_000 * 0.15; // 19,200 tokens
-        const charBudget = TOKEN_BUDGET * CHARS_PER_TOKEN; // ~77,000 chars
-        // Fill from the end, most recent messages first
+        const TOKEN_BUDGET = 128_000 * 0.15;
+        const charBudget = TOKEN_BUDGET * CHARS_PER_TOKEN;
         const msgs = [];
         let totalChars = 0;
         for (let i = best.conv.messages.length - 1; i >= 0; i--) {
             const msg = best.conv.messages[i];
-            const msgChars = msg.content.length + msg.role.length + 10; // overhead for formatting
+            const msgChars = msg.content.length + msg.role.length + 10;
             if (totalChars + msgChars > charBudget)
                 break;
             msgs.unshift(msg);
@@ -242,11 +196,8 @@ export async function startMcpServer() {
     // ── Background sync to Arweave ──────────────────────
     let syncTimer = null;
     try {
-        const encryptionKey = loadKey(passphrase);
-        if (existsSync(getIdentityPath())) {
-            const identityKey = loadIdentityPrivateKey(encryptionKey);
-            const pubKey = publicKeyFromPrivate(identityKey);
-            const walletAddress = addressFromPublicKey(pubKey);
+        if (isIdentityAvailable()) {
+            const { encryptionKey, identityKey, walletAddress } = resolveIdentity(passphrase);
             const useTestnet = process.env.SINGLECONTEXT_TESTNET === "true";
             const backend = new TurboBackend({
                 privateKeyHex: Buffer.from(identityKey).toString("hex"),
@@ -255,7 +206,6 @@ export async function startMcpServer() {
             syncTimer = setInterval(() => {
                 syncDirtyFacts(db, encryptionKey, identityKey, walletAddress, backend);
             }, SYNC_INTERVAL_MS);
-            // Start conversation watcher (polls every 30s)
             const watcher = new ConversationWatcher(async (conversation) => {
                 try {
                     const stateKey = `conversation_offset:${conversation.client}:${conversation.id}`;
@@ -268,7 +218,7 @@ export async function startMcpServer() {
                     process.stderr.write(`SingleContext: conversation synced [${conversation.client}/${conversation.project}] ${txIds.length} chunk(s), cursor=${conversation.messages.length}\n`);
                 }
                 catch (err) {
-                    process.stderr.write(`SingleContext: conversation sync failed: ${err instanceof Error ? err.message : String(err)}\n`);
+                    process.stderr.write(`SingleContext: conversation sync failed: ${toErrorMessage(err)}\n`);
                 }
             }, 30_000);
             watcher.start();
@@ -280,12 +230,10 @@ export async function startMcpServer() {
         }
     }
     catch (err) {
-        process.stderr.write(`SingleContext: auto-sync disabled (${err instanceof Error ? err.message : "key error"}). Facts are stored locally only.\n`);
+        process.stderr.write(`SingleContext: auto-sync disabled (${toErrorMessage(err)}). Facts are stored locally only.\n`);
     }
-    // ── Connect stdio transport ───────────────────────────
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    // Clean up on exit
     function shutdown() {
         if (syncTimer)
             clearInterval(syncTimer);
@@ -295,10 +243,6 @@ export async function startMcpServer() {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
 }
-/**
- * Check for dirty facts and push them to Arweave as a delta shard.
- * Runs on a timer. No-op if nothing changed.
- */
 async function syncDirtyFacts(db, encryptionKey, identityKey, walletAddress, backend) {
     try {
         const dirtyFacts = getDirtyFacts(db);
@@ -325,7 +269,7 @@ async function syncDirtyFacts(db, encryptionKey, identityKey, walletAddress, bac
         setMeta(db, "last_pushed_version", String(lastVersion));
     }
     catch (err) {
-        process.stderr.write(`SingleContext: sync failed, will retry: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.stderr.write(`SingleContext: sync failed, will retry: ${toErrorMessage(err)}\n`);
     }
 }
 //# sourceMappingURL=server.js.map

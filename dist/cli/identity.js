@@ -1,26 +1,9 @@
-import { existsSync } from "fs";
-import { createInterface } from "readline";
 import { openDatabase, getMeta } from "../core/db.js";
 import { TurboBackend } from "../core/backends/turbo.js";
-import { loadKey, loadIdentityPrivateKey, getDbPath } from "./init.js";
-function prompt(question) {
-    const rl = createInterface({ input: process.stdin, output: process.stderr });
-    return new Promise((resolve) => {
-        rl.question(question, (answer) => {
-            rl.close();
-            resolve(answer.trim());
-        });
-    });
-}
-/**
- * Show wallet address, balance, and identity info.
- */
+import { loadKey, loadIdentityPrivateKey } from "./init.js";
+import { prompt, ensureInitialized } from "./util.js";
 export async function identityCommand(options = {}) {
-    const dbPath = getDbPath();
-    if (!existsSync(dbPath)) {
-        console.error("SingleContext not initialized. Run `singlecontext init` first.");
-        process.exit(1);
-    }
+    const dbPath = ensureInitialized();
     const db = openDatabase(dbPath);
     const walletAddress = getMeta(db, "wallet_address");
     const currentVersion = getMeta(db, "current_version") ?? "0";

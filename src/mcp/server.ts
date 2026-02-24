@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { existsSync } from "fs";
+import { readFileSync } from "fs";
 import {
   openDatabase,
   upsertFact,
@@ -20,29 +20,27 @@ import { recallContext, formatContext } from "../core/engine.js";
 import { createChunkedShards, serializeShard, factToUpsertOp } from "../core/shard.js";
 import { encrypt } from "../core/crypto.js";
 import { pushShard, pushConversationDelta, pullConversations } from "../core/sync.js";
-import {
-  publicKeyFromPrivate,
-  addressFromPublicKey,
-} from "../core/identity.js";
 import { TurboBackend } from "../core/backends/turbo.js";
-import { loadKey, loadIdentityPrivateKey, getDbPath, getIdentityPath } from "../cli/init.js";
+import { getDbPath } from "../cli/init.js";
 import { keychainLoad } from "../core/keychain.js";
-import { ConversationWatcher } from "../core/watcher.js";
+import { ConversationWatcher, discoverConversationFiles } from "../core/watcher.js";
+import { parseCursorTranscript } from "../core/parsers/cursor.js";
+import { parseClaudeCodeJSONL } from "../core/parsers/claude-code.js";
+import { VERSION } from "../version.js";
+import {
+  resolveIdentity,
+  isIdentityAvailable,
+  toErrorMessage,
+} from "../cli/util.js";
 import type { Fact, ShardOperation, Conversation } from "../types.js";
 import type Database from "better-sqlite3";
 
-const SYNC_INTERVAL_MS = 60_000; // 1 minute
+const SYNC_INTERVAL_MS = 60_000;
 
 let db: Database.Database;
 
-/**
- * Start the SingleContext MCP server.
- * Communicates over stdio. Cursor spawns this as a child process.
- */
 export async function startMcpServer(): Promise<void> {
-  // Load passphrase from keychain (required for MCP background mode).
-  const keychainPassphrase = keychainLoad();
-  const passphrase = keychainPassphrase ?? null;
+  const passphrase = keychainLoad();
   if (!passphrase) {
     process.stderr.write(
       "SingleContext: no passphrase found in system keychain. Run `singlecontext init` first.\n"
@@ -54,17 +52,15 @@ export async function startMcpServer(): Promise<void> {
   const dbPath = getDbPath();
   db = openDatabase(dbPath);
 
-  // Detect current project scope from working directory
   const cwd = process.cwd();
   const projectName = cwd.split("/").pop() ?? "unknown";
   const defaultScope = `project:${projectName}`;
 
   const server = new McpServer({
     name: "singlecontext",
-    version: "0.1.2",
+    version: VERSION,
   });
 
-  // ── store_fact ────────────────────────────────────────
   server.tool(
     "store_fact",
     "Store an important fact for long-term memory. Call this when the user expresses a preference, makes a project decision, shares architectural context, or provides information that should be remembered across sessions.",
@@ -93,7 +89,6 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ key, value, tags, scope }) => {
       const factScope = scope ?? "global";
-      // Prefix key with scope if not already namespaced
       const fullKey = key.startsWith("global:") || key.startsWith("project:")
         ? key
         : `${factScope}:${key}`;
@@ -115,17 +110,11 @@ export async function startMcpServer(): Promise<void> {
       upsertFact(db, fact);
 
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Stored: ${fullKey}`,
-          },
-        ],
+        content: [{ type: "text" as const, text: `Stored: ${fullKey}` }],
       };
     }
   );
 
-  // ── recall_context ────────────────────────────────────
   server.tool(
     "recall_context",
     "Recall relevant facts from long-term memory. Call this at the start of a conversation or when you need context about a topic. Returns facts ranked by relevance.",
@@ -145,7 +134,6 @@ export async function startMcpServer(): Promise<void> {
       const allFacts = getAllFacts(db);
       const results = recallContext(topic, searchScope, allFacts);
 
-      // Increment access counts
       for (const fact of results) {
         incrementAccessCount(db, fact.key);
       }
@@ -159,17 +147,11 @@ export async function startMcpServer(): Promise<void> {
       }
 
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: formatContext(results),
-          },
-        ],
+        content: [{ type: "text" as const, text: formatContext(results) }],
       };
     }
   );
 
-  // ── delete_fact ───────────────────────────────────────
   server.tool(
     "delete_fact",
     "Delete a fact from memory. Use when information is no longer accurate or relevant.",
@@ -181,24 +163,18 @@ export async function startMcpServer(): Promise<void> {
       if (!existing) {
         return {
           content: [
-            {
-              type: "text" as const,
-              text: `No fact found with key: ${key}`,
-            },
+            { type: "text" as const, text: `No fact found with key: ${key}` },
           ],
         };
       }
 
       deleteFact(db, key);
       return {
-        content: [
-          { type: "text" as const, text: `Deleted: ${key}` },
-        ],
+        content: [{ type: "text" as const, text: `Deleted: ${key}` }],
       };
     }
   );
 
-  // ── recall_conversation ─────────────────────────────
   server.tool(
     "recall_conversation",
     "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. SingleContext watches local conversation files and syncs them to Arweave.",
@@ -217,37 +193,18 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ topic, client, project }) => {
       const conversations: Conversation[] = [];
-      const encryptionKey = loadKey(passphrase);
 
-      // Pull historical conversations from Arweave first.
-      if (existsSync(getIdentityPath())) {
+      if (isIdentityAvailable()) {
         try {
-          const identityKey = loadIdentityPrivateKey(encryptionKey);
-          const pubKey = publicKeyFromPrivate(identityKey);
-          const walletAddress = addressFromPublicKey(pubKey);
-          const remote = await pullConversations(walletAddress, encryptionKey);
-          for (const conv of remote) {
-            conversations.push({
-              id: conv.id,
-              client: conv.client,
-              project: conv.project,
-              messages: conv.messages,
-              startedAt: conv.startedAt,
-              updatedAt: conv.updatedAt,
-            });
-          }
+          const identity = resolveIdentity(passphrase);
+          const remote = await pullConversations(identity.walletAddress, identity.encryptionKey);
+          conversations.push(...remote);
         } catch {
           // If remote pull fails, continue with local fallback.
         }
       }
 
-      // Local fallback: parse conversation files directly.
-      const watcher = new ConversationWatcher(() => {}, 999999);
-      const local = watcher.discoverAllConversationFiles();
-
-      const { readFileSync } = await import("fs");
-      const { parseCursorTranscript } = await import("../core/parsers/cursor.js");
-      const { parseClaudeCodeJSONL } = await import("../core/parsers/claude-code.js");
+      const local = discoverConversationFiles();
 
       for (const f of local) {
         if (client && client !== "any" && client !== f.client) continue;
@@ -270,7 +227,6 @@ export async function startMcpServer(): Promise<void> {
         };
       }
 
-      // Simple keyword search across conversations
       const keywords = topic.toLowerCase().split(/\s+/);
       const scored = conversations.map((conv) => {
         const allText = conv.messages.map((m) => m.content).join(" ").toLowerCase();
@@ -286,17 +242,15 @@ export async function startMcpServer(): Promise<void> {
         };
       }
 
-      // Budget-based truncation: ~19,200 tokens ≈ 77,000 chars (default model budget)
       const CHARS_PER_TOKEN = 4;
-      const TOKEN_BUDGET = 128_000 * 0.15; // 19,200 tokens
-      const charBudget = TOKEN_BUDGET * CHARS_PER_TOKEN; // ~77,000 chars
+      const TOKEN_BUDGET = 128_000 * 0.15;
+      const charBudget = TOKEN_BUDGET * CHARS_PER_TOKEN;
 
-      // Fill from the end, most recent messages first
       const msgs: typeof best.conv.messages = [];
       let totalChars = 0;
       for (let i = best.conv.messages.length - 1; i >= 0; i--) {
         const msg = best.conv.messages[i];
-        const msgChars = msg.content.length + msg.role.length + 10; // overhead for formatting
+        const msgChars = msg.content.length + msg.role.length + 10;
         if (totalChars + msgChars > charBudget) break;
         msgs.unshift(msg);
         totalChars += msgChars;
@@ -318,12 +272,8 @@ export async function startMcpServer(): Promise<void> {
   let syncTimer: ReturnType<typeof setInterval> | null = null;
 
   try {
-    const encryptionKey = loadKey(passphrase);
-
-    if (existsSync(getIdentityPath())) {
-      const identityKey = loadIdentityPrivateKey(encryptionKey);
-      const pubKey = publicKeyFromPrivate(identityKey);
-      const walletAddress = addressFromPublicKey(pubKey);
+    if (isIdentityAvailable()) {
+      const { encryptionKey, identityKey, walletAddress } = resolveIdentity(passphrase);
       const useTestnet = process.env.SINGLECONTEXT_TESTNET === "true";
 
       const backend = new TurboBackend({
@@ -335,7 +285,6 @@ export async function startMcpServer(): Promise<void> {
         syncDirtyFacts(db, encryptionKey, identityKey, walletAddress, backend);
       }, SYNC_INTERVAL_MS);
 
-      // Start conversation watcher (polls every 30s)
       const watcher = new ConversationWatcher(async (conversation) => {
         try {
           const stateKey = `conversation_offset:${conversation.client}:${conversation.id}`;
@@ -356,7 +305,7 @@ export async function startMcpServer(): Promise<void> {
           );
         } catch (err) {
           process.stderr.write(
-            `SingleContext: conversation sync failed: ${err instanceof Error ? err.message : String(err)}\n`
+            `SingleContext: conversation sync failed: ${toErrorMessage(err)}\n`
           );
         }
       }, 30_000);
@@ -375,15 +324,13 @@ export async function startMcpServer(): Promise<void> {
     }
   } catch (err) {
     process.stderr.write(
-      `SingleContext: auto-sync disabled (${err instanceof Error ? err.message : "key error"}). Facts are stored locally only.\n`
+      `SingleContext: auto-sync disabled (${toErrorMessage(err)}). Facts are stored locally only.\n`
     );
   }
 
-  // ── Connect stdio transport ───────────────────────────
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // Clean up on exit
   function shutdown() {
     if (syncTimer) clearInterval(syncTimer);
     db.close();
@@ -393,10 +340,6 @@ export async function startMcpServer(): Promise<void> {
   process.on("SIGTERM", shutdown);
 }
 
-/**
- * Check for dirty facts and push them to Arweave as a delta shard.
- * Runs on a timer. No-op if nothing changed.
- */
 async function syncDirtyFacts(
   db: Database.Database,
   encryptionKey: Uint8Array,
@@ -445,7 +388,7 @@ async function syncDirtyFacts(
     setMeta(db, "last_pushed_version", String(lastVersion));
   } catch (err) {
     process.stderr.write(
-      `SingleContext: sync failed, will retry: ${err instanceof Error ? err.message : String(err)}\n`
+      `SingleContext: sync failed, will retry: ${toErrorMessage(err)}\n`
     );
   }
 }

@@ -1,12 +1,11 @@
-import { existsSync } from "fs";
 import { randomBytes } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { TurboBackend } from "../core/backends/turbo.js";
 import { encrypt } from "../core/crypto.js";
-import { addressFromPublicKey, publicKeyFromPrivate, signShard } from "../core/identity.js";
-import { getIdentityPath, loadIdentityPrivateKey, loadKey } from "./init.js";
+import { signShard } from "../core/identity.js";
 import { keychainLoad } from "../core/keychain.js";
 import { discoverConversations } from "./list.js";
+import { isIdentityAvailable, resolveIdentity } from "./util.js";
 import type { Conversation } from "../types.js";
 import type { Tag } from "../core/storage.js";
 
@@ -48,12 +47,11 @@ export async function shareCommand(
       "No passphrase found in system keychain. Run `singlecontext init` again to store it."
     );
   }
-  if (!existsSync(getIdentityPath())) {
+  if (!isIdentityAvailable()) {
     throw new Error("No local identity found. Run `singlecontext init` first.");
   }
 
-  const encryptionKey = loadKey(passphrase);
-  const identityKey = loadIdentityPrivateKey(encryptionKey);
+  const { encryptionKey, identityKey, walletAddress } = resolveIdentity(passphrase);
   const shareKey = new Uint8Array(randomBytes(32));
   const shareId = uuidv4();
 
@@ -66,7 +64,6 @@ export async function shareCommand(
   const encrypted = encrypt(serialized, shareKey);
 
   const signature = signShard(encrypted, identityKey);
-  const walletAddress = addressFromPublicKey(publicKeyFromPrivate(identityKey));
   const tags: Tag[] = [
     { name: "App-Name", value: "singlecontext" },
     { name: "Type", value: "conversation-share" },

@@ -296,6 +296,38 @@ export async function queryConversationShare(shareId) {
     };
 }
 /**
+ * Fetch a single transaction's tags by tx id.
+ */
+export async function queryTransactionTagsById(txId) {
+    const query = `
+    query($id: ID!) {
+      transactions(ids: [$id]) {
+        edges {
+          node {
+            id
+            tags { name value }
+          }
+        }
+      }
+    }
+  `;
+    const json = (await gqlRequest({
+        query,
+        variables: { id: txId },
+    }));
+    if (json.errors && json.errors.length > 0) {
+        const msg = json.errors.map((e) => e.message ?? "unknown").join("; ");
+        throw new Error(`Arweave GraphQL returned errors: ${msg}`);
+    }
+    const node = json.data?.transactions?.edges?.[0]?.node;
+    if (!node)
+        return null;
+    return {
+        txId: node.id,
+        tags: new Map(node.tags.map((t) => [t.name, t.value])),
+    };
+}
+/**
  * Download a shard's raw data from Arweave.
  */
 export async function downloadShard(txId, maxBytes) {
@@ -345,25 +377,10 @@ export async function fetchIdentity(walletAddress, identityMaxBytes = 16 * 1024)
             return sb - sa; // newest first
         return b.txId.localeCompare(a.txId);
     })[0];
-    // Salt is stored as a hex string in tags
-    const query = `
-    query {
-      transactions(ids: ["${identityTx.txId}"]) {
-        edges {
-          node {
-            id
-            tags { name value }
-          }
-        }
-      }
-    }
-  `;
-    const json = (await gqlRequest({ query }));
-    const edge = json.data.transactions.edges[0];
-    if (!edge)
+    const txMeta = await queryTransactionTagsById(identityTx.txId);
+    if (!txMeta)
         return null;
-    const tagMap = new Map(edge.node.tags.map((t) => [t.name, t.value]));
-    const saltHex = tagMap.get("Salt");
+    const saltHex = txMeta.tags.get("Salt");
     if (!saltHex)
         return null;
     const salt = Buffer.from(saltHex, "hex");

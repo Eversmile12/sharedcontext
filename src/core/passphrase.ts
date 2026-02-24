@@ -3,7 +3,6 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { BIP39_ENGLISH } from "./bip39-words.js";
 
 export const PHRASE_WORD_COUNT = 12;
-const WORDLIST_SIZE = 2048; // 2048 = 2^11
 const ENTROPY_BITS = 128;
 const CHECKSUM_BITS = ENTROPY_BITS / 32; // BIP39 checksum rule
 const TOTAL_BITS = ENTROPY_BITS + CHECKSUM_BITS; // 132 bits -> 12 words

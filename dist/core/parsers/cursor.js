@@ -25,7 +25,6 @@ export function parseCursorTranscript(text, fileId, project) {
     let currentRole = null;
     let currentContent = [];
     let inToolBlock = false;
-    let inUserQuery = false;
     function flush() {
         if (currentRole && currentContent.length > 0) {
             const content = currentContent.join("\n").trim();
@@ -42,7 +41,6 @@ export function parseCursorTranscript(text, fileId, project) {
             flush();
             currentRole = "user";
             inToolBlock = false;
-            inUserQuery = false;
             continue;
         }
         if (trimmed === "assistant:") {
@@ -65,13 +63,7 @@ export function parseCursorTranscript(text, fileId, project) {
             }
             continue;
         }
-        // Strip <user_query> / </user_query> tags
-        if (trimmed === "<user_query>") {
-            inUserQuery = true;
-            continue;
-        }
-        if (trimmed === "</user_query>") {
-            inUserQuery = false;
+        if (trimmed === "<user_query>" || trimmed === "</user_query>") {
             continue;
         }
         // Strip [Thinking] prefix but keep the rest as it's useful context
@@ -85,8 +77,23 @@ export function parseCursorTranscript(text, fileId, project) {
         }
     }
     flush();
-    // Merge consecutive same-role messages (common in Cursor transcripts
-    // where assistant has multiple tool-call-interrupted segments)
+    const merged = mergeConsecutiveMessages(messages);
+    const now = new Date().toISOString();
+    return {
+        id: fileId,
+        client: "cursor",
+        project,
+        messages: merged,
+        startedAt: now,
+        updatedAt: now,
+    };
+}
+/**
+ * Merge consecutive messages with the same role into a single message.
+ * Common in both Cursor and Claude Code transcripts where tool calls
+ * split assistant responses into multiple segments.
+ */
+export function mergeConsecutiveMessages(messages) {
     const merged = [];
     for (const msg of messages) {
         const last = merged[merged.length - 1];
@@ -97,14 +104,6 @@ export function parseCursorTranscript(text, fileId, project) {
             merged.push({ ...msg });
         }
     }
-    const now = new Date().toISOString();
-    return {
-        id: fileId,
-        client: "cursor",
-        project,
-        messages: merged,
-        startedAt: now,
-        updatedAt: now,
-    };
+    return merged;
 }
 //# sourceMappingURL=cursor.js.map

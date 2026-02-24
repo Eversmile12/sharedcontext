@@ -10,13 +10,14 @@ import { startMcpServer } from "./mcp/server.js";
 import { listConversationsCommand, listContextCommand } from "./cli/list.js";
 import { shareCommand } from "./cli/share.js";
 import { syncCommand } from "./cli/sync.js";
+import { VERSION } from "./version.js";
 
 const program = new Command();
 
 program
   .name("singlecontext")
   .description("Sovereign, portable LLM context layer")
-  .version("0.1.2");
+  .version(VERSION);
 
 program
   .command("init")

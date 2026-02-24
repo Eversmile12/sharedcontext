@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage } from "../../types.js";
+import { mergeConsecutiveMessages } from "./cursor.js";
 
 /**
  * Parse a Claude Code session JSONL file into a Conversation.
@@ -54,16 +55,7 @@ export function parseClaudeCodeJSONL(
     // Skip file-history-snapshot, system, etc.
   }
 
-  // Merge consecutive same-role messages
-  const merged: ConversationMessage[] = [];
-  for (const msg of messages) {
-    const last = merged[merged.length - 1];
-    if (last && last.role === msg.role) {
-      last.content += "\n\n" + msg.content;
-    } else {
-      merged.push({ ...msg });
-    }
-  }
+  const merged = mergeConsecutiveMessages(messages);
 
   const now = new Date().toISOString();
   return {

@@ -3,6 +3,7 @@ import { homedir } from "os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
+import { toErrorMessage } from "./util.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -66,8 +67,7 @@ export function autoSetupDetectedClients(): AutoSetupResult {
       setupTarget(target);
       configured.push(target);
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      failed.push({ target, reason });
+      failed.push({ target, reason: toErrorMessage(err) });
     }
   }
 
@@ -215,8 +215,7 @@ function readJsonObject(path: string): JsonObject {
     }
     return parsed;
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Invalid JSON in ${path}: ${reason}`);
+    throw new Error(`Invalid JSON in ${path}: ${toErrorMessage(err)}`);
   }
 }
 

@@ -38,3 +38,6 @@ temp/
 tmp-*/
 *.tmp
 *.tgz
+
+# Video project
+video/

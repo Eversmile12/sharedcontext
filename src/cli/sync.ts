@@ -1,38 +1,59 @@
-import { existsSync } from "fs";
 import { decrypt } from "../core/crypto.js";
-import { downloadShard, queryConversationShare } from "../core/arweave.js";
+import {
+  downloadShard,
+  queryConversationShare,
+  queryTransactionTagsById,
+} from "../core/arweave.js";
 import {
   hasSharedConversationImport,
   openDatabase,
   saveSharedConversationImport,
 } from "../core/db.js";
 import { verifySignature } from "../core/identity.js";
-import { getDbPath } from "./init.js";
 import {
   decodeShareToken,
   extractToken,
   type ConversationSharePayload,
 } from "./share.js";
+import { ensureInitialized } from "./util.js";
 import type { Conversation } from "../types.js";
 
 const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 
 export async function syncCommand(urlOrToken: string): Promise<void> {
-  const dbPath = getDbPath();
-  if (!existsSync(dbPath)) {
-    console.error("SingleContext not initialized. Run `singlecontext init` first.");
-    process.exit(1);
-  }
+  const dbPath = ensureInitialized();
 
   const token = extractToken(urlOrToken);
   const decoded = decodeShareToken(token);
-  let shareInfo = null as Awaited<ReturnType<typeof queryConversationShare>>;
   let txId = decoded.txId;
   let encrypted: Uint8Array | null = null;
+  let shareWallet = "";
+  let shareSignature = "";
+  let resolvedShareId = "";
 
   if (txId) {
     try {
+      const txMeta = await queryTransactionTagsById(txId);
+      if (!txMeta) {
+        throw new Error(`No transaction metadata found for tx id: ${txId}`);
+      }
+      const type = txMeta.tags.get("Type") ?? "";
+      const tagShareId = txMeta.tags.get("Share-Id") ?? "";
+      const wallet = txMeta.tags.get("Wallet") ?? "";
+      const signature = txMeta.tags.get("Signature")?.trim() ?? "";
+      if (type !== "conversation-share") {
+        throw new Error("Transaction is not a conversation share.");
+      }
+      if (tagShareId !== decoded.shareId) {
+        throw new Error("Share token does not match transaction share id.");
+      }
+      if (!wallet || !signature) {
+        throw new Error("Share transaction is missing signer metadata.");
+      }
       encrypted = await downloadShard(txId, MAX_SHARE_BYTES);
+      shareWallet = wallet;
+      shareSignature = signature;
+      resolvedShareId = tagShareId;
     } catch {
       // Fall back to Share-Id lookup for eventual consistency or stale tx references.
       encrypted = null;
@@ -40,19 +61,23 @@ export async function syncCommand(urlOrToken: string): Promise<void> {
   }
 
   if (!encrypted) {
-    shareInfo = await queryConversationShare(decoded.shareId);
+    const shareInfo = await queryConversationShare(decoded.shareId);
     if (!shareInfo) {
       throw new Error(`No share found for id: ${decoded.shareId}`);
     }
+    if (!shareInfo.wallet || !shareInfo.signature) {
+      throw new Error("Share transaction is missing signer metadata.");
+    }
     txId = shareInfo.txId;
+    resolvedShareId = shareInfo.shareId;
+    shareWallet = shareInfo.wallet;
+    shareSignature = shareInfo.signature;
     encrypted = await downloadShard(txId, MAX_SHARE_BYTES);
   }
 
-  if (shareInfo?.signature && shareInfo.wallet) {
-    const valid = verifySignature(encrypted, shareInfo.signature, shareInfo.wallet);
-    if (!valid) {
-      throw new Error("Share signature verification failed.");
-    }
+  const valid = verifySignature(encrypted, shareSignature, shareWallet);
+  if (!valid) {
+    throw new Error("Share signature verification failed.");
   }
 
   let payload: ConversationSharePayload;
@@ -65,7 +90,7 @@ export async function syncCommand(urlOrToken: string): Promise<void> {
 
   const conversation = validatePayload(payload);
   const db = openDatabase(dbPath);
-  const alreadyImported = hasSharedConversationImport(db, decoded.shareId);
+  const alreadyImported = hasSharedConversationImport(db, resolvedShareId);
   if (alreadyImported) {
     db.close();
     console.log("Share already imported.");
@@ -73,14 +98,14 @@ export async function syncCommand(urlOrToken: string): Promise<void> {
   }
 
   saveSharedConversationImport(db, {
-    shareId: decoded.shareId,
+    shareId: resolvedShareId,
     txId: txId ?? "unknown",
     conversation,
   });
   db.close();
 
   console.log("Conversation imported.\n");
-  console.log(`  Share ID:     ${decoded.shareId}`);
+  console.log(`  Share ID:     ${resolvedShareId}`);
   console.log(`  Conversation: ${conversation.id} (${conversation.client})`);
   console.log(`  Project:      ${conversation.project}`);
   console.log(`  Messages:     ${conversation.messages.length}`);

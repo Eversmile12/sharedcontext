@@ -18,7 +18,5 @@ export declare function loadKey(passphrase: string): Uint8Array;
 export declare function loadIdentityPrivateKey(key: Uint8Array): Uint8Array;
 export declare function getSingleContextDir(): string;
 export declare function getDbPath(): string;
-export declare function getShardsDir(): string;
-export declare function getSaltPath(): string;
 export declare function getIdentityPath(): string;
 //# sourceMappingURL=init.d.ts.map
