@@ -10,8 +10,8 @@ const DEFAULT_DATA_ENDPOINTS = [
     "https://arweave.net",
     "https://g8way.io",
 ];
-const ARWEAVE_GQL_ENDPOINTS = parseEndpointList(process.env.SINGLECONTEXT_ARWEAVE_GQLS, DEFAULT_GQL_ENDPOINTS);
-const ARWEAVE_DATA_ENDPOINTS = parseEndpointList(process.env.SINGLECONTEXT_ARWEAVE_DATAS, DEFAULT_DATA_ENDPOINTS);
+const ARWEAVE_GQL_ENDPOINTS = parseEndpointList(process.env.SHAREDCONTEXT_ARWEAVE_GQLS, DEFAULT_GQL_ENDPOINTS);
+const ARWEAVE_DATA_ENDPOINTS = parseEndpointList(process.env.SHAREDCONTEXT_ARWEAVE_DATAS, DEFAULT_DATA_ENDPOINTS);
 const GQL_PAGE_SIZE = 1000;
 const GQL_MAX_PAGES = 1000;
 /**
@@ -27,7 +27,7 @@ export async function queryShards(walletAddress) {
     query($wallet: String!, $first: Int!, $after: String) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["singlecontext"] },
+          { name: "App-Name", values: ["sharedcontext"] },
           { name: "Wallet", values: [$wallet] }
         ],
         sort: HEIGHT_ASC,
@@ -135,7 +135,7 @@ export async function queryConversationChunks(walletAddress) {
     query($wallet: String!, $first: Int!, $after: String) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["singlecontext"] },
+          { name: "App-Name", values: ["sharedcontext"] },
           { name: "Wallet", values: [$wallet] },
           { name: "Type", values: ["conversation"] }
         ],
@@ -250,7 +250,7 @@ export async function queryConversationShare(shareId) {
     query($shareId: String!) {
       transactions(
         tags: [
-          { name: "App-Name", values: ["singlecontext"] },
+          { name: "App-Name", values: ["sharedcontext"] },
           { name: "Type", values: ["conversation-share"] },
           { name: "Share-Id", values: [$shareId] }
         ],

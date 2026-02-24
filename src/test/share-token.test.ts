@@ -31,9 +31,9 @@ describe("share token", () => {
     assert.equal(decoded.txId, undefined);
   });
 
-  it("extracts token from singlecontext URL", () => {
+  it("extracts token from sharedcontext URL", () => {
     const token = "abc123";
-    const input = `singlecontext://share/${token}`;
+    const input = `sharedcontext://share/${token}`;
     assert.equal(extractToken(input), token);
   });
 

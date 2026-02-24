@@ -36,6 +36,23 @@ import type { Fact, ShardOperation, Conversation } from "../types.js";
 import type Database from "better-sqlite3";
 
 const SYNC_INTERVAL_MS = 60_000;
+const CONVERSATION_QUERY_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "about",
+  "awesome",
+  "chat",
+  "continue",
+  "conversation",
+  "let",
+  "lets",
+  "our",
+  "the",
+  "tool",
+  "tools",
+  "with",
+]);
 
 let db: Database.Database;
 
@@ -43,11 +60,11 @@ export async function startMcpServer(): Promise<void> {
   const passphrase = keychainLoad();
   if (!passphrase) {
     process.stderr.write(
-      "SingleContext: no passphrase found in system keychain. Run `singlecontext init` first.\n"
+      "SharedContext: no passphrase found in system keychain. Run `sharedcontext init` first.\n"
     );
     process.exit(1);
   }
-  process.stderr.write("SingleContext: passphrase loaded from system keychain\n");
+  process.stderr.write("SharedContext: passphrase loaded from system keychain\n");
 
   const dbPath = getDbPath();
   db = openDatabase(dbPath);
@@ -56,10 +73,10 @@ export async function startMcpServer(): Promise<void> {
   const projectName = cwd.split("/").pop() ?? "unknown";
   const defaultScope = `project:${projectName}`;
 
-  const server = new McpServer({
-    name: "singlecontext",
-    version: VERSION,
-  });
+  const server = new McpServer(
+    { name: "sharedcontext", version: VERSION },
+    { instructions: "SharedContext is a sovereign, portable LLM context layer. Use store_fact to persist important decisions, preferences and project context. Use recall_context at conversation start or when context is needed. Use recall_conversation to retrieve past conversations from other AI clients." },
+  );
 
   server.tool(
     "store_fact",
@@ -177,7 +194,7 @@ export async function startMcpServer(): Promise<void> {
 
   server.tool(
     "recall_conversation",
-    "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. SingleContext watches local conversation files and syncs them to Arweave.",
+    "Retrieve a previous conversation from another AI client (Cursor, Claude Code). Use this when the user says 'continue the conversation about X' or 'what did we discuss about Y'. SharedContext watches local conversation files and syncs them to Arweave.",
     {
       topic: z
         .string()
@@ -227,16 +244,18 @@ export async function startMcpServer(): Promise<void> {
         };
       }
 
-      const keywords = topic.toLowerCase().split(/\s+/);
+      const topicTokens = tokenizeTopic(topic);
       const scored = conversations.map((conv) => {
-        const allText = conv.messages.map((m) => m.content).join(" ").toLowerCase();
-        const score = keywords.reduce((s, kw) => s + (allText.includes(kw) ? 1 : 0), 0);
+        const score = scoreConversation(conv, topicTokens);
         return { conv, score };
       });
 
-      scored.sort((a, b) => b.score - a.score);
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.conv.updatedAt.localeCompare(a.conv.updatedAt);
+      });
       const best = scored[0];
-      if (best.score === 0) {
+      if (best.score <= 0) {
         return {
           content: [{ type: "text" as const, text: `No conversations matching "${topic}" found.` }],
         };
@@ -268,13 +287,17 @@ export async function startMcpServer(): Promise<void> {
     }
   );
 
+  // Connect transport immediately so MCP clients discover tools without delay.
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+
   // ── Background sync to Arweave ──────────────────────
   let syncTimer: ReturnType<typeof setInterval> | null = null;
 
   try {
     if (isIdentityAvailable()) {
       const { encryptionKey, identityKey, walletAddress } = resolveIdentity(passphrase);
-      const useTestnet = process.env.SINGLECONTEXT_TESTNET === "true";
+      const useTestnet = process.env.SHAREDCONTEXT_TESTNET === "true";
 
       const backend = new TurboBackend({
         privateKeyHex: Buffer.from(identityKey).toString("hex"),
@@ -301,35 +324,32 @@ export async function startMcpServer(): Promise<void> {
           if (txIds.length === 0) return;
           setMeta(db, stateKey, String(conversation.messages.length));
           process.stderr.write(
-            `SingleContext: conversation synced [${conversation.client}/${conversation.project}] ${txIds.length} chunk(s), cursor=${conversation.messages.length}\n`
+            `SharedContext: conversation synced [${conversation.client}/${conversation.project}] ${txIds.length} chunk(s), cursor=${conversation.messages.length}\n`
           );
         } catch (err) {
           process.stderr.write(
-            `SingleContext: conversation sync failed: ${toErrorMessage(err)}\n`
+            `SharedContext: conversation sync failed: ${toErrorMessage(err)}\n`
           );
         }
       }, 30_000);
       watcher.start();
 
       process.stderr.write(
-        `SingleContext: auto-sync every ${SYNC_INTERVAL_MS / 1000}s → Arweave (${useTestnet ? "testnet" : "mainnet"})\n`
+        `SharedContext: auto-sync every ${SYNC_INTERVAL_MS / 1000}s → Arweave (${useTestnet ? "testnet" : "mainnet"})\n`
       );
       process.stderr.write(
-        "SingleContext: conversation watcher active (Cursor + Claude Code)\n"
+        "SharedContext: conversation watcher active (Cursor + Claude Code)\n"
       );
     } else {
       process.stderr.write(
-        "SingleContext: no identity found, auto-sync disabled. Run `singlecontext init` first.\n"
+        "SharedContext: no identity found, auto-sync disabled. Run `sharedcontext init` first.\n"
       );
     }
   } catch (err) {
     process.stderr.write(
-      `SingleContext: auto-sync disabled (${toErrorMessage(err)}). Facts are stored locally only.\n`
+      `SharedContext: auto-sync disabled (${toErrorMessage(err)}). Facts are stored locally only.\n`
     );
   }
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
 
   function shutdown() {
     if (syncTimer) clearInterval(syncTimer);
@@ -379,7 +399,7 @@ async function syncDirtyFacts(
 
       lastVersion = shard.shard_version;
       process.stderr.write(
-        `SingleContext: synced v${shard.shard_version} (${operations.length} ops, ${encrypted.length}B) → ${txId}\n`
+        `SharedContext: synced v${shard.shard_version} (${operations.length} ops, ${encrypted.length}B) → ${txId}\n`
       );
     }
 
@@ -388,7 +408,45 @@ async function syncDirtyFacts(
     setMeta(db, "last_pushed_version", String(lastVersion));
   } catch (err) {
     process.stderr.write(
-      `SingleContext: sync failed, will retry: ${toErrorMessage(err)}\n`
+      `SharedContext: sync failed, will retry: ${toErrorMessage(err)}\n`
     );
   }
+}
+
+function tokenizeTopic(topic: string): string[] {
+  const tokens = topic
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 1 && !CONVERSATION_QUERY_STOPWORDS.has(token));
+  if (tokens.length > 0) return tokens;
+  return topic.toLowerCase().split(/\s+/).filter((token) => token.length > 0);
+}
+
+function scoreConversation(conv: Conversation, topicTokens: string[]): number {
+  if (topicTokens.length === 0) return 0;
+
+  const text = conv.messages.map((m) => m.content).join(" ").toLowerCase();
+  const tokenSet = new Set(text.split(/[^a-z0-9]+/).filter(Boolean));
+
+  let exactTokenMatches = 0;
+  for (const token of topicTokens) {
+    if (tokenSet.has(token)) exactTokenMatches += 1;
+  }
+  if (exactTokenMatches === 0) return 0;
+
+  const projectLower = conv.project.toLowerCase();
+  const projectMatch = topicTokens.some((token) => projectLower.includes(token)) ? 1 : 0;
+  const recencyBoost = normalizedRecency(conv.updatedAt);
+
+  // Main signal is exact token overlap. Project and recency are small tie-breakers.
+  return exactTokenMatches * 2 + projectMatch * 1.5 + recencyBoost * 0.3;
+}
+
+function normalizedRecency(updatedAtIso: string): number {
+  const updatedMs = Date.parse(updatedAtIso);
+  if (!Number.isFinite(updatedMs)) return 0;
+  const days = (Date.now() - updatedMs) / (1000 * 60 * 60 * 24);
+  if (days <= 0) return 1;
+  if (days >= 30) return 0;
+  return 1 - days / 30;
 }

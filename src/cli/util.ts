@@ -16,7 +16,7 @@ export function prompt(question: string): Promise<string> {
 export function ensureInitialized(): string {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
-    console.error("SingleContext not initialized. Run `singlecontext init` first.");
+    console.error("SharedContext not initialized. Run `sharedcontext init` first.");
     process.exit(1);
   }
   return dbPath;

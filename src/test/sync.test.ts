@@ -12,7 +12,7 @@ describe("sync", () => {
       const tags = buildShardTags("0xABC", 42, "delta", "0xSIG");
       const tagMap = new Map(tags.map((t) => [t.name, t.value]));
 
-      assert.equal(tagMap.get("App-Name"), "singlecontext");
+      assert.equal(tagMap.get("App-Name"), "sharedcontext");
       assert.equal(tagMap.get("Wallet"), "0xABC");
       assert.equal(tagMap.get("Version"), "42");
       assert.equal(tagMap.get("Type"), "delta");

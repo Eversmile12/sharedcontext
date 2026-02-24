@@ -15,13 +15,17 @@ import { VERSION } from "./version.js";
 const program = new Command();
 
 program
-  .name("singlecontext")
+  .name("sharedcontext")
   .description("Sovereign, portable LLM context layer")
   .version(VERSION);
+program.showSuggestionAfterError(true);
+program.showHelpAfterError(
+  "\nRun `sharedcontext --help` for usage and examples."
+);
 
 program
   .command("init")
-  .description("Initialize SingleContext with a new 12-word recovery phrase")
+  .description("Initialize SharedContext with a new 12-word recovery phrase")
   .option("--existing", "Restore from an existing recovery phrase")
   .action(async (options) => {
     if (options.existing) {
@@ -96,7 +100,7 @@ list
     listContextCommand(options);
   });
 
-program
+const share = program
   .command("share <conversationId>")
   .description("Create a share URL/token for a conversation")
   .option("--client <client>", "Disambiguate duplicate IDs: cursor | claude-code")
@@ -104,6 +108,13 @@ program
   .action(async (conversationId, options) => {
     await shareCommand(conversationId, options);
   });
+share.showHelpAfterError(
+  "\nRun `sharedcontext list conversations` first, then `sharedcontext share <conversationId>`."
+);
+share.addHelpText(
+  "after",
+  "\nExamples:\n  sharedcontext list conversations\n  sharedcontext share <conversationId>\n  sharedcontext share <conversationId> --client cursor"
+);
 
 program
   .command("sync <urlOrToken>")

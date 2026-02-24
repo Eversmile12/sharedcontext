@@ -1,7 +1,7 @@
 import { execFileSync } from "child_process";
 import { platform, homedir } from "os";
 import { join } from "path";
-const SERVICE = "singlecontext";
+const SERVICE = "sharedcontext";
 const ACCOUNT = "passphrase";
 /** Path to the user's login keychain on macOS */
 function loginKeychain() {
@@ -27,7 +27,7 @@ export function keychainStore(passphrase) {
         execFileSync("security", ["add-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w", passphrase, kc], { stdio: "ignore" });
     }
     else if (os === "linux") {
-        execFileSync("secret-tool", ["store", "--label=SingleContext passphrase", "service", SERVICE, "account", ACCOUNT], { stdio: ["pipe", "ignore", "ignore"], input: passphrase });
+        execFileSync("secret-tool", ["store", "--label=SharedContext passphrase", "service", SERVICE, "account", ACCOUNT], { stdio: ["pipe", "ignore", "ignore"], input: passphrase });
     }
     else if (os === "win32") {
         // Read passphrase from stdin to avoid putting it in command args.

@@ -23,24 +23,24 @@ describe("engine", () => {
   describe("scope filtering", () => {
     const facts = [
       makeFact({ key: "global-fact", scope: "global" }),
-      makeFact({ key: "singlecontext-fact", id: "id-s", scope: "project:singlecontext" }),
+      makeFact({ key: "sharedcontext-fact", id: "id-s", scope: "project:sharedcontext" }),
       makeFact({ key: "other-fact", id: "id-o", scope: "project:other" }),
     ];
 
     it("includes global facts for any scope", () => {
-      const result = recallContext("anything", "project:singlecontext", facts);
+      const result = recallContext("anything", "project:sharedcontext", facts);
       const keys = result.map((f) => f.key);
       assert.ok(keys.includes("global-fact"));
     });
 
     it("includes matching scope facts", () => {
-      const result = recallContext("anything", "project:singlecontext", facts);
+      const result = recallContext("anything", "project:sharedcontext", facts);
       const keys = result.map((f) => f.key);
-      assert.ok(keys.includes("singlecontext-fact"));
+      assert.ok(keys.includes("sharedcontext-fact"));
     });
 
     it("excludes non-matching scope facts", () => {
-      const result = recallContext("anything", "project:singlecontext", facts);
+      const result = recallContext("anything", "project:sharedcontext", facts);
       const keys = result.map((f) => f.key);
       assert.ok(!keys.includes("other-fact"));
     });
@@ -125,14 +125,14 @@ describe("engine", () => {
   describe("formatContext", () => {
     it("outputs lean format without scope or tags", () => {
       const facts = [
-        makeFact({ key: "project:singlecontext:storage:backend", value: "Arweave", scope: "project:singlecontext", tags: ["storage"] }),
+        makeFact({ key: "project:sharedcontext:storage:backend", value: "Arweave", scope: "project:sharedcontext", tags: ["storage"] }),
       ];
       const output = formatContext(facts);
       assert.ok(output.includes("[MEMORY]"));
       assert.ok(output.includes("[/MEMORY]"));
       assert.ok(output.includes("storage backend: Arweave"));
       // Should NOT contain internal metadata
-      assert.ok(!output.includes("[project:singlecontext]"));
+      assert.ok(!output.includes("[project:sharedcontext]"));
       assert.ok(!output.includes("(tags:"));
     });
 

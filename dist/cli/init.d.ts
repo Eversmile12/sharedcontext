@@ -1,10 +1,10 @@
 /**
- * Initialize a new SingleContext instance.
+ * Initialize a new SharedContext instance.
  * Generates a 12-word recovery phrase and derives everything from it.
  */
 export declare function initCommand(): Promise<void>;
 /**
- * Restore SingleContext from an existing recovery phrase.
+ * Restore SharedContext from an existing recovery phrase.
  * Derives the wallet, queries Arweave for shards, and reconstructs local state.
  */
 export declare function initExistingCommand(): Promise<void>;
@@ -16,7 +16,7 @@ export declare function loadKey(passphrase: string): Uint8Array;
  * Load the identity private key (decrypts identity.enc with the derived key).
  */
 export declare function loadIdentityPrivateKey(key: Uint8Array): Uint8Array;
-export declare function getSingleContextDir(): string;
+export declare function getSharedContextDir(): string;
 export declare function getDbPath(): string;
 export declare function getIdentityPath(): string;
 //# sourceMappingURL=init.d.ts.map

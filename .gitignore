@@ -7,7 +7,7 @@ dist/
 *.tsbuildinfo
 
 # Local app state / secrets
-.singlecontext/
+.sharedcontext/
 *.db
 *.db-shm
 *.db-wal

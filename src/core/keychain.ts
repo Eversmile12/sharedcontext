@@ -2,7 +2,7 @@ import { execFileSync } from "child_process";
 import { platform, homedir } from "os";
 import { join } from "path";
 
-const SERVICE = "singlecontext";
+const SERVICE = "sharedcontext";
 const ACCOUNT = "passphrase";
 
 /** Path to the user's login keychain on macOS */
@@ -39,7 +39,7 @@ export function keychainStore(passphrase: string): void {
   } else if (os === "linux") {
     execFileSync(
       "secret-tool",
-      ["store", "--label=SingleContext passphrase", "service", SERVICE, "account", ACCOUNT],
+      ["store", "--label=SharedContext passphrase", "service", SERVICE, "account", ACCOUNT],
       { stdio: ["pipe", "ignore", "ignore"], input: passphrase }
     );
   } else if (os === "win32") {

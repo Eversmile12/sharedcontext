@@ -1,6 +1,6 @@
 {
-  "name": "singlecontext",
-  "version": "0.1.2",
+  "name": "ai-sharedcontext",
+  "version": "0.0.1",
   "description": "Sovereign, portable LLM context layer",
   "type": "module",
   "main": "dist/index.js",
@@ -8,13 +8,13 @@
     "dist/**/*",
     "!dist/test/**",
     "README.md",
-    "SINGLECONTEXT_OVERVIEW.md"
+    "SHAREDCONTEXT_OVERVIEW.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "bin": {
-    "singlecontext": "dist/index.js",
+    "sharedcontext": "dist/index.js",
     "sc": "dist/index.js"
   },
   "scripts": {

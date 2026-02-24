@@ -157,7 +157,7 @@ function updateMcpConfig(configPath: string): void {
     args: [fileURLToPath(new URL("../index.js", import.meta.url)), "serve"],
   };
 
-  mcpServers.singlecontext = serverEntry;
+  mcpServers.sharedcontext = serverEntry;
 
   const updated: JsonObject = {
     ...root,
@@ -172,8 +172,8 @@ function updateCodexConfig(configPath: string): void {
   const command = process.execPath;
   const args = [fileURLToPath(new URL("../index.js", import.meta.url)), "serve"];
 
-  const singlecontextSection = [
-    "[mcp_servers.singlecontext]",
+  const sharedcontextSection = [
+    "[mcp_servers.sharedcontext]",
     `command = ${toTomlString(command)}`,
     `args = [${args.map((arg) => toTomlString(arg)).join(", ")}]`,
   ].join("\n");
@@ -182,13 +182,13 @@ function updateCodexConfig(configPath: string): void {
 
   const existing = existsSync(configPath) ? readFileSync(configPath, "utf-8") : "";
   const normalized = existing.replace(/\r\n/g, "\n").trimEnd();
-  const sectionRegex = /^\[mcp_servers\.singlecontext\]\n[\s\S]*?(?=^\[[^\]]+\]\n?|$)/m;
+  const sectionRegex = /^\[mcp_servers\.sharedcontext\]\n[\s\S]*?(?=^\[[^\]]+\]\n?|$)/m;
 
   const nextContent = sectionRegex.test(normalized)
-    ? normalized.replace(sectionRegex, singlecontextSection)
+    ? normalized.replace(sectionRegex, sharedcontextSection)
     : normalized === ""
-      ? singlecontextSection
-      : `${normalized}\n\n${singlecontextSection}`;
+      ? sharedcontextSection
+      : `${normalized}\n\n${sharedcontextSection}`;
 
   writeFileSync(configPath, `${nextContent}\n`, "utf-8");
 }

@@ -10,7 +10,7 @@ export async function identityCommand(options = {}) {
     const lastPushed = getMeta(db, "last_pushed_version") ?? "0";
     const identityPushed = getMeta(db, "identity_pushed");
     db.close();
-    console.log("SingleContext Identity\n");
+    console.log("SharedContext Identity\n");
     console.log(`  Wallet:          ${walletAddress}`);
     console.log(`  Local version:   ${currentVersion}`);
     console.log(`  Pushed version:  ${lastPushed}`);

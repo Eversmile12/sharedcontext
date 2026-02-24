@@ -88,13 +88,13 @@ function getTokenBudget(model?: string): number {
 
 /**
  * Strip the scope prefix from a fact key to get a short, readable label.
- * "project:singlecontext:storage:backend" → "storage backend"
+ * "project:sharedcontext:storage:backend" → "storage backend"
  * "global:coding_style"           → "coding style"
  */
 function simplifyKey(key: string, scope: string): string {
   let simplified = key;
 
-  // Remove scope prefix: "project:singlecontext:" or "global:"
+  // Remove scope prefix: "project:sharedcontext:" or "global:"
   if (scope.startsWith("project:")) {
     const prefix = scope.replace("project:", "") + ":";
     if (simplified.startsWith(prefix)) {

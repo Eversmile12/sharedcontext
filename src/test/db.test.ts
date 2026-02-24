@@ -41,7 +41,7 @@ let tmpDir: string;
 let db: Database.Database;
 
 function freshDb(): Database.Database {
-  tmpDir = mkdtempSync(join(tmpdir(), "singlecontext-test-"));
+  tmpDir = mkdtempSync(join(tmpdir(), "sharedcontext-test-"));
   return openDatabase(join(tmpDir, "test.db"));
 }
 
@@ -129,10 +129,10 @@ describe("db", () => {
   describe("getFactsByScope", () => {
     it("returns global + matching scope facts", () => {
       upsertFact(db, makeFact({ key: "g", scope: "global" }));
-      upsertFact(db, makeFact({ key: "p", id: "id-p", scope: "project:singlecontext" }));
+      upsertFact(db, makeFact({ key: "p", id: "id-p", scope: "project:sharedcontext" }));
       upsertFact(db, makeFact({ key: "other", id: "id-o", scope: "project:other" }));
 
-      const results = getFactsByScope(db, "project:singlecontext");
+      const results = getFactsByScope(db, "project:sharedcontext");
       const keys = results.map((f) => f.key).sort();
       assert.deepEqual(keys, ["g", "p"]);
     });

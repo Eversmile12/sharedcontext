@@ -42,7 +42,7 @@ describe("crypto", () => {
     describe("encrypt / decrypt", () => {
         const key = deriveKey("test", generateSalt());
         it("round-trips plaintext correctly", () => {
-            const plaintext = new TextEncoder().encode("hello singlecontext");
+            const plaintext = new TextEncoder().encode("hello sharedcontext");
             const encrypted = encrypt(plaintext, key);
             const decrypted = decrypt(encrypted, key);
             assert.deepEqual(decrypted, plaintext);

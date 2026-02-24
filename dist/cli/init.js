@@ -10,22 +10,28 @@ import { generatePhrase, validatePhrase, phraseToString, PHRASE_WORD_COUNT, } fr
 import { pullAndReconstruct } from "../core/sync.js";
 import { fetchIdentity } from "../core/arweave.js";
 import { prompt, toErrorMessage } from "./util.js";
-const SINGLECONTEXT_DIR = process.env.SINGLECONTEXT_HOME || join(homedir(), ".singlecontext");
-const DB_PATH = join(SINGLECONTEXT_DIR, "singlecontext.db");
-const SALT_PATH = join(SINGLECONTEXT_DIR, "salt");
-const IDENTITY_PATH = join(SINGLECONTEXT_DIR, "identity.enc");
+const BANNER = `
+▞▀▖▌             ▌▞▀▖      ▐        ▐  
+▚▄ ▛▀▖▝▀▖▙▀▖▞▀▖▞▀▌▌  ▞▀▖▛▀▖▜▀ ▞▀▖▚▗▘▜▀ 
+▖ ▌▌ ▌▞▀▌▌  ▛▀ ▌ ▌▌ ▖▌ ▌▌ ▌▐ ▖▛▀ ▗▚ ▐ ▖
+▝▀ ▘ ▘▝▀▘▘  ▝▀▘▝▀▘▝▀ ▝▀ ▘ ▘ ▀ ▝▀▘▘ ▘ ▀ `;
+const SHAREDCONTEXT_DIR = process.env.SHAREDCONTEXT_HOME || join(homedir(), ".sharedcontext");
+const DB_PATH = join(SHAREDCONTEXT_DIR, "sharedcontext.db");
+const SALT_PATH = join(SHAREDCONTEXT_DIR, "salt");
+const IDENTITY_PATH = join(SHAREDCONTEXT_DIR, "identity.enc");
 /**
- * Initialize a new SingleContext instance.
+ * Initialize a new SharedContext instance.
  * Generates a 12-word recovery phrase and derives everything from it.
  */
 export async function initCommand() {
     if (existsSync(DB_PATH)) {
-        console.log("SingleContext is already initialized at ~/.singlecontext/");
-        console.log("To reinitialize, delete ~/.singlecontext/ first.");
+        console.log("SharedContext is already initialized at ~/.sharedcontext/");
+        console.log("To reinitialize, delete ~/.sharedcontext/ first.");
         return;
     }
-    console.log("Initializing SingleContext...\n");
-    mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
+    console.log(BANNER);
+    console.log("Initializing SharedContext...\n");
+    mkdirSync(SHAREDCONTEXT_DIR, { recursive: true });
     // Generate 12-word recovery phrase
     const words = generatePhrase();
     // Show phrase on alternate screen (like vim/less — vanishes when done)
@@ -46,7 +52,7 @@ export async function initCommand() {
     if (parts.length < 2 ||
         parts[0].toLowerCase() !== words[idx1].toLowerCase() ||
         parts[1].toLowerCase() !== words[idx2].toLowerCase()) {
-        console.error("Confirmation failed. Please run `singlecontext init` again.");
+        console.error("Confirmation failed. Please run `sharedcontext init` again.");
         process.exit(1);
     }
     const phrase = phraseToString(words);
@@ -77,24 +83,26 @@ export async function initCommand() {
         console.warn("Could not store in keychain:", toErrorMessage(err));
         console.warn("Without keychain storage, background MCP startup will fail.");
     }
-    console.log("\nSingleContext initialized at ~/.singlecontext/");
-    console.log("  Database: ~/.singlecontext/singlecontext.db");
-    console.log("  Identity: ~/.singlecontext/identity.enc");
+    console.log("\nSharedContext initialized at ~/.sharedcontext/");
+    console.log("  Database: ~/.sharedcontext/sharedcontext.db");
+    console.log("  Identity: ~/.sharedcontext/identity.enc");
     console.log(`\n  Wallet:   ${keypair.address}`);
     printAutoSetupSummary();
-    console.log("\nStart `singlecontext serve` and use MCP tools to store and recall facts.");
+    console.log("\nOpen your AI client and use SharedContext MCP tools right away.");
+    console.log("Tip: run `sharedcontext serve` only for debugging MCP startup.");
 }
 /**
- * Restore SingleContext from an existing recovery phrase.
+ * Restore SharedContext from an existing recovery phrase.
  * Derives the wallet, queries Arweave for shards, and reconstructs local state.
  */
 export async function initExistingCommand() {
     if (existsSync(DB_PATH)) {
-        console.log("SingleContext is already initialized at ~/.singlecontext/");
-        console.log("To reinitialize, delete ~/.singlecontext/ first.");
+        console.log("SharedContext is already initialized at ~/.sharedcontext/");
+        console.log("To reinitialize, delete ~/.sharedcontext/ first.");
         return;
     }
-    console.log("Restore SingleContext from recovery phrase.\n");
+    console.log(BANNER);
+    console.log("Restore SharedContext from recovery phrase.\n");
     const input = await prompt(`Enter your ${PHRASE_WORD_COUNT}-word recovery phrase: `);
     const words = input.split(/\s+/).map((w) => w.toLowerCase());
     const validation = validatePhrase(words);
@@ -107,7 +115,7 @@ export async function initExistingCommand() {
     console.log("Deriving identity...");
     const keypair = deriveKeypairFromPhrase(phrase);
     console.log(`Wallet: ${keypair.address}`);
-    mkdirSync(SINGLECONTEXT_DIR, { recursive: true });
+    mkdirSync(SHAREDCONTEXT_DIR, { recursive: true });
     console.log("\nQuerying Arweave and reconstructing local state...");
     try {
         const result = await pullAndReconstruct(keypair.address, phrase, DB_PATH);
@@ -128,7 +136,7 @@ export async function initExistingCommand() {
     }
     catch (err) {
         const { rmSync } = await import("fs");
-        rmSync(SINGLECONTEXT_DIR, { recursive: true, force: true });
+        rmSync(SHAREDCONTEXT_DIR, { recursive: true, force: true });
         throw err;
     }
     // Store phrase in keychain
@@ -139,16 +147,18 @@ export async function initExistingCommand() {
     catch (err) {
         console.warn("Could not store in keychain:", toErrorMessage(err));
     }
-    console.log("\nSingleContext restored at ~/.singlecontext/");
+    console.log("\nSharedContext restored at ~/.sharedcontext/");
     console.log(`  Wallet: ${keypair.address}`);
     printAutoSetupSummary();
+    console.log("\nOpen your AI client and use SharedContext MCP tools right away.");
+    console.log("Tip: run `sharedcontext serve` only for debugging MCP startup.");
 }
 /**
  * Load the encryption key from salt + passphrase.
  */
 export function loadKey(passphrase) {
     if (!existsSync(SALT_PATH)) {
-        console.error("SingleContext not initialized. Run `singlecontext init` first.");
+        console.error("SharedContext not initialized. Run `sharedcontext init` first.");
         process.exit(1);
     }
     const salt = new Uint8Array(readFileSync(SALT_PATH));
@@ -159,14 +169,14 @@ export function loadKey(passphrase) {
  */
 export function loadIdentityPrivateKey(key) {
     if (!existsSync(IDENTITY_PATH)) {
-        console.error("No identity found. Run `singlecontext init` first.");
+        console.error("No identity found. Run `sharedcontext init` first.");
         process.exit(1);
     }
     const encrypted = new Uint8Array(readFileSync(IDENTITY_PATH));
     return decrypt(encrypted, key);
 }
-export function getSingleContextDir() {
-    return SINGLECONTEXT_DIR;
+export function getSharedContextDir() {
+    return SHAREDCONTEXT_DIR;
 }
 export function getDbPath() {
     return DB_PATH;
@@ -178,7 +188,7 @@ function printAutoSetupSummary() {
     const result = autoSetupDetectedClients();
     if (result.detected.length === 0) {
         console.log("\nNo supported MCP client detected (Cursor, Claude Desktop/CLI, Codex).");
-        console.log("Run `singlecontext setup --cursor|--claude|--claude-cli|--codex` after installing your client.");
+        console.log("Run `sharedcontext setup --cursor|--claude|--claude-cli|--codex` after installing your client.");
         return;
     }
     if (result.configured.length > 0) {
@@ -189,7 +199,7 @@ function printAutoSetupSummary() {
         console.warn(`Could not configure ${formatTarget(failure.target)}: ${failure.reason}`);
     }
     if (result.failed.length > 0) {
-        const commands = result.failed.map((item) => `singlecontext setup --${item.target}`).join("  ");
+        const commands = result.failed.map((item) => `sharedcontext setup --${item.target}`).join("  ");
         console.warn(`Run manually if needed: ${commands}`);
     }
 }
