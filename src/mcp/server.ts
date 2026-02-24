@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { readFileSync } from "fs";
+import { readFileSync, statSync } from "fs";
 import {
   openDatabase,
   upsertFact,
@@ -24,7 +24,7 @@ import { TurboBackend } from "../core/backends/turbo.js";
 import { getDbPath } from "../cli/init.js";
 import { keychainLoad } from "../core/keychain.js";
 import { ConversationWatcher, discoverConversationFiles } from "../core/watcher.js";
-import { parseCursorTranscript } from "../core/parsers/cursor.js";
+import { parseCursorTranscript, parseCursorJSONL } from "../core/parsers/cursor.js";
 import { parseClaudeCodeJSONL } from "../core/parsers/claude-code.js";
 import { VERSION } from "../version.js";
 import {
@@ -228,11 +228,19 @@ export async function startMcpServer(): Promise<void> {
         if (project && f.project !== project) continue;
         try {
           const text = readFileSync(f.path, "utf-8");
-          if (f.client === "cursor") {
-            conversations.push(parseCursorTranscript(text, f.fileId, f.project));
+          let conv: Conversation;
+          if (f.client === "claude-code") {
+            conv = parseClaudeCodeJSONL(text, f.fileId, f.project);
+          } else if (f.format === "jsonl") {
+            conv = parseCursorJSONL(text, f.fileId, f.project);
           } else {
-            conversations.push(parseClaudeCodeJSONL(text, f.fileId, f.project));
+            conv = parseCursorTranscript(text, f.fileId, f.project);
           }
+          if (f.client === "cursor") {
+            const stat = statSync(f.path);
+            conv.updatedAt = new Date(stat.mtimeMs).toISOString();
+          }
+          conversations.push(conv);
         } catch {
           // Skip unreadable local files.
         }
@@ -254,10 +262,15 @@ export async function startMcpServer(): Promise<void> {
         if (b.score !== a.score) return b.score - a.score;
         return b.conv.updatedAt.localeCompare(a.conv.updatedAt);
       });
-      const best = scored[0];
-      if (best.score <= 0) {
+      const best = scored.find((s) => s.score > 0 && s.conv.messages.length >= 3);
+      if (!best) {
         return {
-          content: [{ type: "text" as const, text: `No conversations matching "${topic}" found.` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `No conversations matching "${topic}" found. (Excluding very short conversations — the "continue" request may have matched the current conversation instead of a prior one.)`,
+            },
+          ],
         };
       }
 
@@ -331,7 +344,7 @@ export async function startMcpServer(): Promise<void> {
             `SharedContext: conversation sync failed: ${toErrorMessage(err)}\n`
           );
         }
-      }, 30_000);
+      }, 10_000);
       watcher.start();
 
       process.stderr.write(

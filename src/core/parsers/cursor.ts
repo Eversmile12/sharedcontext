@@ -1,6 +1,76 @@
 import type { Conversation, ConversationMessage } from "../../types.js";
 
 /**
+ * Parse a Cursor JSONL transcript (new directory-based format) into a Conversation.
+ *
+ * Format: one JSON object per line.
+ *   { "role": "user"|"assistant", "message": { "content": [{ "type": "text", "text": "..." }] } }
+ *
+ * User messages have their text wrapped in <user_query> tags which we strip.
+ */
+export function parseCursorJSONL(
+  text: string,
+  fileId: string,
+  project: string
+): Conversation {
+  const messages: ConversationMessage[] = [];
+  const lines = text.split("\n").filter((l) => l.trim());
+
+  for (const line of lines) {
+    let obj: Record<string, unknown>;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    const role = obj.role as string;
+    if (role !== "user" && role !== "assistant") continue;
+
+    const message = obj.message as Record<string, unknown> | undefined;
+    if (!message) continue;
+
+    const content = message.content;
+    if (!Array.isArray(content)) continue;
+
+    const texts: string[] = [];
+    for (const block of content) {
+      if (typeof block === "object" && block !== null) {
+        const b = block as Record<string, unknown>;
+        if (b.type === "text" && typeof b.text === "string") {
+          texts.push(b.text);
+        }
+      }
+    }
+
+    let joined = texts.join("\n").trim();
+    if (!joined) continue;
+
+    if (role === "user") {
+      joined = joined
+        .replace(/^\s*<user_query>\s*/, "")
+        .replace(/\s*<\/user_query>\s*$/, "")
+        .trim();
+    }
+
+    if (joined) {
+      messages.push({ role, content: joined });
+    }
+  }
+
+  const merged = mergeConsecutiveMessages(messages);
+  const now = new Date().toISOString();
+  return {
+    id: fileId,
+    client: "cursor",
+    project,
+    messages: merged,
+    startedAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
  * Parse a Cursor agent transcript (.txt) into a Conversation.
  *
  * Format:

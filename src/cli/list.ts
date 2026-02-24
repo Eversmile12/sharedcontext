@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { discoverConversationFiles } from "../core/watcher.js";
-import { parseCursorTranscript } from "../core/parsers/cursor.js";
+import { parseCursorTranscript, parseCursorJSONL } from "../core/parsers/cursor.js";
 import { parseClaudeCodeJSONL } from "../core/parsers/claude-code.js";
 import { pullConversations } from "../core/sync.js";
 import { keychainLoad } from "../core/keychain.js";
@@ -142,11 +142,19 @@ function loadLocalConversations(): Conversation[] {
   for (const file of files) {
     try {
       const text = readFileSync(file.path, "utf-8");
-      const conversation =
-        file.client === "cursor"
-          ? parseCursorTranscript(text, file.fileId, file.project)
-          : parseClaudeCodeJSONL(text, file.fileId, file.project);
+      let conversation: Conversation;
+      if (file.client === "claude-code") {
+        conversation = parseClaudeCodeJSONL(text, file.fileId, file.project);
+      } else if (file.format === "jsonl") {
+        conversation = parseCursorJSONL(text, file.fileId, file.project);
+      } else {
+        conversation = parseCursorTranscript(text, file.fileId, file.project);
+      }
       if (conversation.messages.length > 0) {
+        if (file.client === "cursor") {
+          const stat = statSync(file.path);
+          conversation.updatedAt = new Date(stat.mtimeMs).toISOString();
+        }
         conversations.push(conversation);
       }
     } catch {

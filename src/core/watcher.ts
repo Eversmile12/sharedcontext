@@ -1,7 +1,7 @@
 import { readdirSync, statSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { parseCursorTranscript } from "./parsers/cursor.js";
+import { parseCursorTranscript, parseCursorJSONL } from "./parsers/cursor.js";
 import { parseClaudeCodeJSONL } from "./parsers/claude-code.js";
 import type { Conversation } from "../types.js";
 
@@ -18,6 +18,7 @@ export interface WatcherCallback {
 export interface ConversationFileRef {
   path: string;
   client: "cursor" | "claude-code";
+  format: "txt" | "jsonl";
   project: string;
   fileId: string;
 }
@@ -42,14 +43,36 @@ function discoverCursorFiles(): ConversationFileRef[] {
 
       const project = projectDir.split("-").pop() ?? projectDir;
 
-      for (const file of readdirSync(transcriptsDir)) {
-        if (!file.endsWith(".txt")) continue;
-        results.push({
-          path: join(transcriptsDir, file),
-          client: "cursor",
-          project,
-          fileId: file.replace(".txt", ""),
-        });
+      for (const entry of readdirSync(transcriptsDir)) {
+        const entryPath = join(transcriptsDir, entry);
+
+        if (entry.endsWith(".txt")) {
+          results.push({
+            path: entryPath,
+            client: "cursor",
+            format: "txt",
+            project,
+            fileId: entry.replace(".txt", ""),
+          });
+          continue;
+        }
+
+        // New format: directory containing <uuid>.jsonl
+        try {
+          if (!statSync(entryPath).isDirectory()) continue;
+        } catch {
+          continue;
+        }
+        const jsonlPath = join(entryPath, `${entry}.jsonl`);
+        if (existsSync(jsonlPath)) {
+          results.push({
+            path: jsonlPath,
+            client: "cursor",
+            format: "jsonl",
+            project,
+            fileId: entry,
+          });
+        }
       }
     }
   } catch {
@@ -82,6 +105,7 @@ function discoverClaudeCodeFiles(): ConversationFileRef[] {
         results.push({
           path: filePath,
           client: "claude-code",
+          format: "jsonl",
           project,
           fileId: file.replace(".jsonl", ""),
         });
@@ -139,10 +163,14 @@ export class ConversationWatcher {
 
       const content = readFileSync(file.path, "utf-8");
 
-      const conversation =
-        file.client === "cursor"
-          ? parseCursorTranscript(content, file.fileId, file.project)
-          : parseClaudeCodeJSONL(content, file.fileId, file.project);
+      let conversation: Conversation;
+      if (file.client === "claude-code") {
+        conversation = parseClaudeCodeJSONL(content, file.fileId, file.project);
+      } else if (file.format === "jsonl") {
+        conversation = parseCursorJSONL(content, file.fileId, file.project);
+      } else {
+        conversation = parseCursorTranscript(content, file.fileId, file.project);
+      }
 
       if (conversation.messages.length > 0) {
         this.fileStates.set(file.path, {
